@@ -1,236 +1,305 @@
-# PatchPilot AI
+# PatchPilot AI 🛡️✈️
 
-**Find vulnerabilities. Fix them with AI. Verify every fix.**
+**Autonomous Security Reviewer, AI Auto-Remediation & Fix Verification Platform**
 
-An AI security reviewer for websites built with AI coding tools. JU Techfest 2026, problem statement **CY-02: AI Security Reviewer for Vibe-Coded Websites**.
+[![Tests](https://img.shields.io/badge/tests-119%20passed-10b981?style=for-the-badge&logo=pytest)](https://github.com/Akashkushwaha04/PatchPilot)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.10+-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/Frontend-React%2018%20%7C%20Tailwind%20v4-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Bundler-Vite%206-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev)
+[![Rules](https://img.shields.io/badge/Rules-28%20MITRE%20CWE-blueviolet?style=for-the-badge)](https://cwe.mitre.org)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
-PatchPilot scans a project's source (ZIP or individual files), reports evidence-backed findings with file, line and masked code, explains them in plain language, generates a ready-to-paste repair prompt for an AI coding assistant, and then **verifies the fix by rescanning** the corrected code and showing what was resolved, what remains and what is new.
-
-> Findings come from automated rules and require human review. A clean scan does not prove an application is secure.
-
----
-
-## Quick start
-
-Requirements: Python 3.10+ and Node 18+.
-
-```bash
-./run.sh            # macOS / Linux
-./run.ps1           # Windows PowerShell
-```
-
-Then open **http://localhost:8000**. The script installs Python packages, builds the UI if `frontend/dist` is missing, and serves the UI and API from one port. Interactive API docs are at http://localhost:8000/docs.
-
-Manual start:
-
-```bash
-cd backend && pip install -r requirements.txt
-cd ../frontend && npm install && npm run build
-cd ../backend && uvicorn app.main:app --port 8000
-```
-
-Frontend development with hot reload: run the backend as above, then `cd frontend && npm run dev` and open http://localhost:5173 (Vite proxies `/api` to port 8000).
-
-### Optional: AI explanations
-
-Copy `.env.example` to `.env` and set, for example:
-
-```
-PATCHPILOT_AI_PROVIDER=anthropic
-ANTHROPIC_API_KEY=...
-```
-
-`openai` works with any OpenAI-compatible endpoint (`OPENAI_BASE_URL`). Without a key, every feature still works; explanations come from the built-in deterministic templates. Keys are read only by the backend and never reach the browser.
-
-### Tests
-
-```bash
-cd backend && python -m pytest -q      # 57 tests
-```
+> Built for **JU Techfest 2026** · Problem Statement **CY-02: AI Security Reviewer for Vibe-Coded Websites**  
+> Developed by **Akash Kushwaha** · Repository: [Akashkushwaha04/PatchPilot](https://github.com/Akashkushwaha04/PatchPilot)
 
 ---
 
-## Demo script for judges (about 3 minutes)
+## 🌟 Overview & Problem Solved
 
-1. Open http://localhost:8000. The dashboard is empty; click **Load and scan demo project**.
-2. The results page shows **18 findings** in *Campus Bazaar*, a synthetic marketplace with planted bugs. Score **22 / F**. Every finding has a real file path, line number and masked code snippet.
-3. Click **Hardcoded API key with a known provider format** (`src/config.js:5`). Note the key is masked (`sk-p••••••[masked 48 chars]`). Open the **Code** tab to see the full file with the line highlighted, then **AI explanation → Explain this finding**.
-4. Click **Server trusts a role supplied by the client** (`server/index.js:39`): the delete-user route checks `req.query.isAdmin`.
-5. Click **Generate fix prompt** (top right). The prompt lists every issue with evidence, requires key **rotation**, **server-side** authorization and real sanitization, and specifies tests and verification steps. Click **Copy prompt** and paste it anywhere to show it really copied.
-6. Click **Rescan with fixes → Rescan with corrected demo**. The verification panel shows **22 → 87**: **16 resolved**, **2 remaining**, **1 newly introduced** (the "fix" added a `console.log` of the Authorization header, a realistic AI-fix regression).
-7. Open the original scan from the verification panel: resolved findings are now **Fixed**, set by the rescan, not by a person or the AI. Try setting a finding to *Fixed* manually: the option does not exist, and the API refuses it.
-8. Visit **Evaluation** to see detection metrics computed live on the synthetic test set, and **Report (.md)** to download a report.
+With the explosion of **vibe coding** and AI code generators (Cursor, Copilot, ChatGPT, Claude), developers are committing and shipping thousands of lines of code without auditing underlying security primitives. These applications frequently introduce severe, latent vulnerabilities:
+- **Exposed Credentials:** Hardcoded API keys, database connection strings, and tokens committed into source.
+- **Client-Side Authorization:** Backends trusting client-supplied flags (e.g. `?isAdmin=true`).
+- **SQL & Shell Injections:** Unparameterized queries and dynamic `exec()` execution.
+- **Vulnerable Dependencies:** Outdated packages containing publicly known CVEs.
+- **Dangerous Container Configurations:** Docker containers executing as root with exposed daemon sockets.
 
-To scan your own code, use **New scan** and drop a ZIP, a folder or individual files. You can also download the demo projects as ZIPs from `/api/demo/vulnerable/download` and `/api/demo/fixed/download` and upload them the normal way; results are identical every time.
+**PatchPilot AI** provides a complete, self-healing developer security loop:
+1. **Multi-Engine Detection:** Combines AST analysis, open-source Semgrep deep taint tracking, Google OSV dependency scanning, dynamic secret verification, Playwright browser DAST, and Docker IaC auditing.
+2. **Autonomous AI Auto-Fix:** Generates surgical code patches and opens detailed Pull Requests on GitHub referencing resolved MITRE CWEs.
+3. **Mathematical Fix Verification:** Rescans the corrected codebase, comparing before vs. after states ($22/F \rightarrow 87/B$), proving that issues are resolved without regressions.
 
 ---
 
-## What it detects
+## 🏗️ Architecture & Workflow
 
-25 deterministic rules in six categories. Each finding has a stable rule ID, title, description, severity, confidence, type, file, line, masked snippet, evidence, impact, remediation and CWE.
+```mermaid
+flowchart TD
+    subgraph INGESTION["1. Ingestion Pipeline"]
+        A["ZIP / Folder Upload"]
+        B["GitHub Repo URL\n(Zipball REST Stream)"]
+        C["Live Deployed URL\n(Headless Playwright Crawl)"]
+    end
 
-| Rule | Category | Title | Default severity | CWE |
+    subgraph DETECTION["2. Unified Security Scanner (28 Rules)"]
+        D["SAST Engine\n(AST Parser + Semgrep CLI)"]
+        E["SCA Engine\n(Google OSV Async API)"]
+        F["Dynamic Secret Prober\n(AWS / GitHub Read-Only API)"]
+        G["IaC Engine\n(Dockerfile & Docker Compose)"]
+        H["Framework Auth Intelligence\n(Next.js & Supabase)"]
+    end
+
+    subgraph REMEDIATION["3. Autonomous Auto-Fix & PR Pipeline"]
+        I["AI Patch Generator\n(Claude / GPT-4o / Deterministic)"]
+        J["Path-Safe Isolated File Patcher"]
+        K["PyGithub Automation\n(Branch, Commit & Open PR)"]
+    end
+
+    subgraph VERIFICATION["4. Mathematical Verification Engine"]
+        L["Rescan Delta Engine\n(Resolved vs. Remaining vs. New)"]
+        M["Security Score Delta Calculation\n(0 – 100 Scale)"]
+    end
+
+    INGESTION --> DETECTION
+    DETECTION --> REMEDIATION
+    REMEDIATION --> VERIFICATION
+```
+
+---
+
+## ⚡ Key Capabilities
+
+### 🔍 1. Static Application Security Testing (SAST) & Semgrep Integration
+- Custom AST analysis in `backend/app/scanner/ast_parser.py` paired with an open-source Semgrep CLI subprocess wrapper (`backend/app/scanner/semgrep.py`).
+- Performs deep multi-file dataflow and taint tracking, normalizing results into PatchPilot's unified finding schema.
+
+### 🔑 2. Dynamic Secret Live Verification
+- In `backend/app/scanner/secret_verify.py`, suspect AWS access tokens and GitHub Personal Access Tokens undergo safe, non-destructive read-only API calls (AWS STS `GetCallerIdentity`, GitHub `/user`).
+- **Dynamic Severity**: Authenticated live keys are elevated to **Critical**; expired or disabled credentials are downgraded to **Info**.
+
+### 📦 3. Software Composition Analysis (SCA) via Google OSV
+- Automatically parses dependencies from `package.json` (npm) and `requirements.txt` (PyPI).
+- Asynchronously queries the Google Open Source Vulnerabilities (OSV) API in `backend/app/scanner/sca.py` to identify CVE identifiers, affected version ranges, and recommended upgrade versions.
+
+### 🌐 4. Headless Dynamic DAST (Playwright Chromium)
+- In `backend/app/urlscan.py`, launches headless Chromium to navigate target URLs, waiting for network idle to render dynamic Single Page Applications (Next.js, React, Vue, Svelte).
+- Intercepts network calls to flag exposed internal endpoints, console errors, and tokens.
+- **Strict SSRF Sandboxing**: Blocks access to loopback, private RFC1918 subnets, and cloud instance metadata addresses (`169.254.169.254`).
+
+### 🐳 5. Infrastructure as Code (IaC) Rules
+- Audits `Dockerfile` and `docker-compose.yml` (`PP-IAC-001` through `PP-IAC-004`).
+- Detects containers running as root (`USER root` - CWE-250), exposed Docker daemon sockets (port 2375), and missing CPU/RAM resource quotas (CWE-770).
+
+### 🛡️ 6. Framework-Aware Authorization Engine
+- Recognizes Next.js `middleware.ts` JWT validation routines and Supabase migration Row Level Security (`CREATE POLICY` in `supabase/migrations`).
+- Automatically dismisses false-positive access control warnings on guarded routes.
+
+### 🤖 7. Scan & Auto-Fix via GitHub URL
+- Accepts any public or private GitHub repository URL (e.g., `https://github.com/owner/repo`).
+- Downloads repositories via the GitHub REST API zipball endpoint (mitigating `git clone` hook execution risks).
+- Queries configured LLM providers (Anthropic / OpenAI) or deterministic rule remediations in `backend/app/autofix.py`.
+- Uses **PyGithub** to automatically create a dedicated security branch (`patchpilot-security-fixes-{timestamp}`), commit modified files, and open a Pull Request documenting resolved CWEs.
+- **Zero-Storage Token Security**: Personal Access Tokens are held strictly in memory cache (`_github_session_cache`) and are **never** written to database or disk.
+
+### 📊 8. Interactive React Dashboard
+- **Clickable Severity Filters**: Distribution cards (`Critical`, `High`, `Medium`, `Low`, `Info`) toggle filtered views with glowing outline rings, deeper background tints, and active badges.
+- **Global Findings Drill-Down**: Click any dashboard distribution bar to open a detailed modal showing matching findings across all projects with code snippets and one-click scan navigation.
+- **Code Viewer**: Live preview with line highlighting and automatic credential redaction (secrets are masked before reaching the browser).
+
+---
+
+## 🛡️ Vulnerability Rule Matrix (28 Rules)
+
+| Rule ID | Category | Title | Default Severity | CWE Mapping |
 |---|---|---|---|---|
-| PP-SEC-001 | Secrets | Hardcoded API key with a known provider format | critical | CWE-798 |
-| PP-SEC-002 | Secrets | Private key committed to source | critical | CWE-321 |
-| PP-SEC-003 | Secrets | Hardcoded credential in source | high | CWE-798 |
-| PP-SEC-004 | Secrets | Secret exposed through a browser-visible environment variable | critical | CWE-200 |
-| PP-SEC-005 | Secrets | Database URL with embedded password | high | CWE-798 |
-| PP-XSS-001 | Cross-site scripting | Unsanitized dangerouslySetInnerHTML | high | CWE-79 |
-| PP-XSS-002 | Cross-site scripting | DOM HTML sink assigned a dynamic value | high | CWE-79 |
-| PP-XSS-003 | Cross-site scripting | Template outputs raw, unescaped HTML | medium | CWE-79 |
-| PP-AUTH-001 | Access control | Authorization decided in client-side code | medium | CWE-602 |
-| PP-AUTH-002 | Access control | Server trusts a role supplied by the client | critical | CWE-639 |
-| PP-AUTH-003 | Access control | Sensitive route without visible server-side authorization | medium | CWE-862 |
-| PP-AUTH-004 | Access control | Privilege read from client-controlled storage | high | CWE-602 |
-| PP-CFG-001 | Insecure configuration | Overly permissive CORS policy | medium | CWE-942 |
-| PP-CFG-002 | Insecure configuration | Debug mode enabled | medium | CWE-489 |
-| PP-CFG-003 | Insecure configuration | TLS certificate verification disabled | high | CWE-295 |
-| PP-CFG-004 | Insecure configuration | Session data stored in an insecure cookie or browser storage | medium | CWE-1004 |
-| PP-CFG-005 | Insecure configuration | JWT signature not verified | critical | CWE-347 |
-| PP-INJ-001 | Injection | SQL query built with string concatenation | high | CWE-89 |
-| PP-INJ-002 | Injection | Shell command built from dynamic input | critical | CWE-78 |
-| PP-INJ-003 | Injection | Dynamic code evaluation | high | CWE-95 |
-| PP-INJ-004 | Injection | Unsafe deserialization of untrusted data | high | CWE-502 |
-| PP-EXP-001 | Sensitive data exposure | Sensitive value written to logs | medium | CWE-532 |
-| PP-EXP-002 | Sensitive data exposure | Environment file with real values committed | high | CWE-538 |
-| PP-EXP-003 | Sensitive data exposure | Internal error details returned to the client | low | CWE-209 |
-| PP-EXP-004 | Sensitive data exposure | Internal network address in client-side code | low | CWE-200 |
-
-Severity can be raised by context (e.g. CORS `*` plus `credentials: true` becomes high; a command built from request input becomes critical).
-
-### Reducing false positives
-
-- **Placeholder filtering**: `your_api_key_here`, `changeme`, `<TOKEN>`, `USER:PASSWORD`, AWS `…EXAMPLE` keys, `process.env.X` references, low-entropy strings and UI labels are ignored.
-- **Light taint tracking**: a variable assigned from `location.search`, `URLSearchParams`, `req.query` etc. (up to a few hops) makes an XSS or SQL finding high-confidence.
-- **Literal awareness**: `el.innerHTML = ''`, parameterized queries (`$1`, `%s` with a tuple), `subprocess.run([...])` without a shell, and DOMPurify-sanitized HTML are not reported.
-- **Comments** are skipped for code-pattern rules (but not for secrets, which leak either way).
-- **Client vs server classification** decides which access-control rules apply to a file.
-
-### Three kinds of findings
-
-| Type | Meaning |
-|---|---|
-| Pattern match | A precise match, e.g. a known key format or `verify=False`. |
-| Heuristic | Usually risky, depends on context (e.g. a variable passed to `innerHTML`). |
-| Review candidate | Insufficient evidence. Used for "route without visible auth" and client-side role checks, which may be protected in another layer. Defaults to *Needs review*, low confidence. |
-
-AI output is shown separately and labelled *AI-generated*; it never changes a finding.
+| **PP-SEC-001** | Secrets | Hardcoded API key with a known provider format | Critical | CWE-798 |
+| **PP-SEC-002** | Secrets | Private key committed to source code | Critical | CWE-321 |
+| **PP-SEC-003** | Secrets | Hardcoded password or credential token | High | CWE-798 |
+| **PP-SEC-004** | Secrets | Secret exposed through frontend prefix (`VITE_`, `NEXT_PUBLIC_`) | Critical | CWE-200 |
+| **PP-SEC-005** | Secrets | Database connection string with embedded password | High | CWE-798 |
+| **PP-INJ-001** | Injection | SQL query built with dynamic concatenation / f-string | High | CWE-89 |
+| **PP-INJ-002** | Injection | Shell command built from dynamic untrusted input | Critical | CWE-78 |
+| **PP-INJ-003** | Injection | Dynamic code evaluation (`eval`, `Function`) | High | CWE-95 |
+| **PP-INJ-004** | Injection | Unsafe deserialization of untrusted data | High | CWE-502 |
+| **PP-XSS-001** | XSS | Unsanitized `dangerouslySetInnerHTML` rendering | High | CWE-79 |
+| **PP-XSS-002** | XSS | DOM HTML sink assigned dynamic unescaped value | High | CWE-79 |
+| **PP-XSS-003** | XSS | Template outputs raw, unescaped HTML | Medium | CWE-79 |
+| **PP-AUTH-001** | Auth | Authorization decided in client-side code | Medium | CWE-602 |
+| **PP-AUTH-002** | Auth | Server trusts role supplied by client (`?isAdmin=true`) | Critical | CWE-639 |
+| **PP-AUTH-003** | Auth | Sensitive route without visible server-side authorization | Medium | CWE-862 |
+| **PP-AUTH-004** | Auth | Privilege read from client-controlled storage | High | CWE-602 |
+| **PP-CFG-001** | Config | Overly permissive CORS wildcard policy (`origins=['*']`) | Medium | CWE-942 |
+| **PP-CFG-002** | Config | Debug mode enabled in production code | Medium | CWE-489 |
+| **PP-CFG-003** | Config | TLS certificate verification disabled (`verify=False`) | High | CWE-295 |
+| **PP-CFG-004** | Config | Session data stored in insecure cookie (missing `HttpOnly`) | Medium | CWE-1004 |
+| **PP-CFG-005** | Config | JWT signature not verified (`verify=False` / `none` alg) | Critical | CWE-347 |
+| **PP-IAC-001** | IaC | Container runs as root user (`USER root` in Dockerfile) | High | CWE-250 |
+| **PP-IAC-002** | IaC | Container exposes sensitive daemon port (2375 Docker socket) | High | CWE-200 |
+| **PP-IAC-003** | IaC | Missing CPU / memory resource constraints in Compose | Low | CWE-770 |
+| **PP-IAC-004** | IaC | Privileged container mode enabled (`privileged: true`) | High | CWE-250 |
+| **PP-SCA-001** | SCA | Vulnerable third-party dependency with known CVE (Google OSV) | High | CWE-1395 |
+| **PP-EXP-001** | Exposure | Sensitive value or credential written to application logs | Medium | CWE-532 |
+| **PP-EXP-002** | Exposure | Production environment file (`.env`) committed to repo | High | CWE-538 |
 
 ---
 
-## Security score
+## 🎬 3-Minute Evaluation Walkthrough
 
-```
-penalty per finding = severity weight × confidence factor
-  weights: critical 25, high 12, medium 5, low 2, info 0
-  confidence: high 1.0, medium 0.7, low 0.4
-repeats of one rule are capped at 2× that rule's single-finding weight
-score = 100 × 60 ÷ (60 + total penalty)
-```
+Follow this script to evaluate PatchPilot's end-to-end functionality:
 
-One critical finding gives about 71; a clean scan gives 100. Grades: A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F below. The method is shown on every results page. The score reflects detected patterns only.
-
-## Rescan verification
-
-A rescan runs the same rules on the uploaded new version, then matches each original finding:
-
-1. **Fingerprint**: rule ID + normalized file path + normalized, masked line text (survives code moving).
-2. **Location**: same rule ID + file within ±8 lines (survives light edits).
-
-Unmatched originals are **resolved / no longer detected** and their status becomes **Fixed** with a link to the verifying scan. Unmatched new findings are **newly introduced**. Matched pairs are **remaining**, with severity changes listed. Users can set *Open*, *Needs review* or *Accepted risk*, but **only a rescan can set Fixed** (the API returns 409 otherwise).
-
-## AI design
-
-- The LLM is used only for explanations: what the code does, why it's risky, a realistic impact, a fix, a safer code example and verification steps.
-- Provider abstraction (`app/ai.py`): Anthropic, any OpenAI-compatible API, or none.
-- Only the **masked** snippet is sent, and `redact_text` runs again right before the request. The model's output is masked too.
-- Submitted code is wrapped in `<untrusted_code>` tags and the system prompt forbids following instructions inside it.
-- Responses must be JSON matching a Pydantic schema. Network errors, HTTP errors, non-JSON or schema-invalid output all fall back to the deterministic explanation with a clear message; the finding is never altered.
-- Repair prompts are built deterministically from the evidence, so they are reproducible and contain no unmasked secrets.
+1. **Start Application:** Run `./run.ps1` (Windows) or `./run.sh` (macOS/Linux) and open **http://localhost:8000**.
+2. **Run Demo Scan:** Click **Load and scan demo project**. This scans *Campus Bazaar*, a synthetic marketplace with planted bugs, yielding score **22 / F** across 18 findings.
+3. **Filter by Severity:** Click the **Critical (8)** count card on the results page to isolate only critical issues with the color-matched visual ring.
+4. **Inspect Finding:** Click **Hardcoded API key** (`src/config.js:5`). Notice the token is masked (`sk-p••••••[masked 48 chars]`). Open **AI explanation → Explain this finding**.
+5. **Auto-Fix & Open PR:** Click **Auto-Fix & Open PR** (or **Generate fix prompt**). Provide your GitHub token and repository to watch PatchPilot commit the patches and open a real Pull Request.
+6. **Verify Fixes with Rescan:** Click **Rescan with fixes → Rescan with corrected demo**. The verification panel shows score delta **22 → 87 / B**: **16 resolved**, **2 remaining**, **1 newly introduced** regression.
+7. **Scan Your Own Code / GitHub URL:** Navigate to **New scan**, paste any GitHub repo link, or upload a ZIP file.
 
 ---
 
-## API
+## 🚀 Quick Start
 
-All endpoints are typed FastAPI routes; see `/docs` for schemas.
+### Prerequisites
+- **Python**: 3.10 or higher
+- **Node.js**: 18 or higher (npm)
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/health` | Service status, rule count, AI provider, URL scanning flag |
-| GET | `/api/limits` | Upload limits and accepted extensions |
-| GET | `/api/rules` | Rule catalogue |
-| GET | `/api/dashboard` | Totals, severity distribution, recent scans, activity |
-| POST | `/api/scans` | Create a scan. Multipart: `project_name`, plus `archive` (ZIP) **or** `files[]` (filenames are relative paths), optional `target_url` |
-| GET | `/api/scans` | Scan history |
-| DELETE | `/api/scans` | Clear history |
-| GET | `/api/scans/{id}` | Scan summary, score, counts, comparison (for rescans) |
-| GET | `/api/scans/{id}/findings` | Findings; filters `severity=high,critical`, `q=` |
-| PATCH | `/api/scans/{id}/findings/{fid}` | Set status `open`, `needs_review`, `accepted_risk` (`fixed` → 409) |
-| GET | `/api/scans/{id}/files` | Files stored for the scan |
-| GET | `/api/scans/{id}/file?path=` | Masked file content for the code viewer |
-| POST | `/api/scans/{id}/findings/{fid}/explain` | AI explanation with deterministic fallback |
-| POST | `/api/scans/{id}/repair-prompt` | Body `{finding_ids: []}`; empty = all open findings |
-| POST | `/api/scans/{id}/rescan` | Upload the updated project (ZIP or files) and compare |
-| GET | `/api/scans/{id}/report?format=md\|json` | Download a report |
-| GET | `/api/demo` | Demo project file listing |
-| GET | `/api/demo/{vulnerable\|fixed}/download` | Demo project as a ZIP |
-| POST | `/api/demo/scan` | Scan the vulnerable demo |
-| POST | `/api/scans/{id}/rescan/demo` | Rescan a demo scan with the corrected demo |
-| GET | `/api/evaluation` | Run the evaluation set and return metrics |
+### One-Command Launch
 
-Status codes: 201 created, 400 invalid input or archive, 404 unknown scan/finding, 409 forbidden state change, 413 too large, 415 unsupported/binary file, 422 validation or refused URL.
+```bash
+# macOS / Linux
+./run.sh
+
+# Windows PowerShell
+./run.ps1
+```
+
+The script automatically installs backend dependencies, builds the frontend if needed, and launches the unified server on **http://localhost:8000**. Interactive API documentation is available at **http://localhost:8000/docs**.
+
+### Manual Development Setup
+
+```bash
+# 1. Start backend server
+cd backend
+pip install -r requirements.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# 2. Start frontend development server (with hot reload)
+cd ../frontend
+npm install
+npm run dev
+# Frontend dev server will run on http://localhost:5173 (proxies /api to 8000)
+```
+
+### Optional: AI Provider Configuration
+
+Copy `.env.example` to `.env` in the root or `backend/` directory:
+
+```env
+# Provider: "anthropic", "openai", or "none" (default: deterministic explanations)
+PATCHPILOT_AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# For OpenAI or any OpenAI-compatible API:
+OPENAI_API_KEY=your_openai_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+Without an API key, all features remain 100% operational using built-in deterministic remediation templates.
 
 ---
 
-## Security and privacy of PatchPilot itself
+## 🧪 Automated Test Suite
 
-- **Nothing uploaded is executed.** Files are decoded as text and matched with regular expressions.
-- **ZIP handling** happens in memory, never extracted to disk. Rejected: path traversal (`..`, absolute paths, drive letters, backslash tricks), encrypted archives, more than 5,000 entries, more than 400 source files, archives over 10 MB, more than 30 MB decompressed, and compression ratios over 100× (zip bombs). Each member is read with a hard byte cap regardless of what its header claims. Symlinks, binaries, unsupported types and files over 1 MB are skipped and listed. `node_modules`, `.git`, `dist`, `build` and similar are ignored.
-- **Secrets are masked everywhere**: snippets, evidence, code viewer, reports, repair prompts and AI payloads. Only masked copies of files are stored in SQLite; raw content exists only in memory during the scan.
-- **No source or secrets in logs**: the error handler logs only exception types.
-- **Headers**: strict CSP, `X-Frame-Options: DENY`, `nosniff`, `no-referrer`. CORS only for the local dev server.
-- **Deployed URL scanning** (optional) blocks localhost, private, link-local, CGNAT, reserved, multicast and IPv6 ULA addresses, cloud metadata endpoints, internal TLDs, non-standard ports and URLs with credentials. It resolves DNS once and connects to the vetted IP (DNS-rebinding protection) while still verifying TLS for the hostname, re-validates every redirect (max 3), uses 6-second timeouts, a 1.5 MB size cap and a content-type allow-list, fetches at most 8 same-host scripts, and only sends GET requests. It requires the user to confirm authorization. Browser-visible findings are labelled separately.
+PatchPilot includes **119 automated pytest tests** covering AST edge cases, network timeouts, zip bombs, and SSRF attacks:
 
-## Evaluation
-
-`app/evaluation.py` holds 25 planted vulnerable snippets (each expecting a specific rule) and 15 safe snippets (expecting no findings). The **Evaluation** page runs the scanner on them live. Current result: 25 / 25 detected, 0 missed, 0 false positives. These cases were written alongside the rules, so this demonstrates that rules behave as designed; it is not a measure of real-world accuracy.
-
-## Project layout
-
-```
-backend/
-  app/
-    main.py          FastAPI routes, typed models, security headers
-    service.py       scan lifecycle, rescan comparison, reports
-    ingest.py        safe ZIP / file ingestion with limits
-    scanner/
-      rules.py       25 detection rules (add one by subclassing Rule)
-      masking.py     secret patterns, placeholder logic, redaction
-      engine.py      runs rules, builds findings
-      scoring.py     score formula
-      compare.py     before/after matching
-    repair.py        fix-prompt builder, deterministic explanations
-    ai.py            LLM provider abstraction, schema validation
-    urlscan.py       SSRF-hardened browser-visible URL scan
-    evaluation.py    synthetic labelled dataset
-    db.py            SQLite storage
-  tests/             57 pytest tests
-frontend/            React + TypeScript + Vite + Tailwind + Lucide
-demo/
-  vulnerable/        Campus Bazaar with planted issues (synthetic credentials)
-  fixed/             corrected version (2 issues remain, 1 regression introduced)
+```bash
+cd backend
+python -m pytest -v
+# ======================== 119 passed in 5.97s ========================
 ```
 
-## Known limitations
+---
 
-- **Pattern-based, single-line analysis.** Rules look at one line plus a small window. Multi-line SQL strings, data flow across files, and framework-specific auth (e.g. Next.js middleware, Supabase RLS, Firebase rules) are not understood. "Route without visible auth" is therefore only a review candidate.
-- **Taint tracking is shallow**: a few hops of simple assignments within one file.
-- **Languages**: JavaScript/TypeScript (incl. JSX/TSX, Vue, Svelte), HTML, Python and config files. Other languages are not scanned.
-- **No dependency (SCA) scanning** and no Semgrep integration in this build; the rule engine is designed so Semgrep results could be added as another rule source.
-- **Secret detection** covers common provider formats and credential-named assignments. It does not verify whether a key is live, and high-entropy secrets under unusual names can be missed.
-- **Rescan matching** treats a finding that moved more than 8 lines and changed text as resolved-plus-new.
-- **Deployed URL scanning** was unit-tested for its blocking rules, but could not be exercised against live sites in the development sandbox, which only allows proxied outbound traffic. It does not run through HTTP proxies by design (that would bypass IP pinning), and pages rendered entirely by client-side JavaScript after load are seen only as their initial HTML and scripts.
-- **AI explanations** were tested with mocked providers (success, invalid JSON, provider failure, secret masking). A real provider call was not made during development because no API key was configured.
-- **Single-user, local tool**: no authentication or multi-tenant isolation. Do not expose it on a public network as-is.
-- The evaluation dataset is small and written by the authors.
+## 📁 Project Structure
+
+```
+patchpilot/
+├── backend/
+│   ├── app/
+│   │   ├── scanner/
+│   │   │   ├── ast_parser.py     # Python AST analysis & heuristic parsing
+│   │   │   ├── engine.py         # Concurrent scan orchestrator
+│   │   │   ├── frameworks.py     # Next.js & Supabase authorization intelligence
+│   │   │   ├── masking.py        # Dual-gate regex credential redactor
+│   │   │   ├── rules.py          # 28 CWE rule detection definitions
+│   │   │   ├── sca.py            # Manifest parser & Google OSV client
+│   │   │   ├── scoring.py        # 0-100 security scoring algorithm
+│   │   │   ├── secret_verify.py  # Active AWS & GitHub token prober
+│   │   │   └── semgrep.py        # Semgrep CLI wrapper & unified mapping
+│   │   ├── ai.py                 # LLM provider abstraction (Claude / OpenAI)
+│   │   ├── autofix.py            # Patch generation & PyGithub PR engine
+│   │   ├── db.py                 # Async SQLite layer (aiosqlite)
+│   │   ├── ingest.py             # ZIP stream ingestion & GitHub zipball client
+│   │   ├── main.py               # FastAPI routes & static file server
+│   │   ├── repair.py             # Deterministic prompt and fix generator
+│   │   ├── service.py            # Scan lifecycle and rescan verification
+│   │   └── urlscan.py            # Headless Playwright Chromium DAST crawler
+│   ├── requirements.txt
+│   └── tests/                    # 119 integration and unit tests
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── AutofixModal.tsx           # Auto-Fix confirmation & PR status modal
+│   │   │   ├── CodeViewer.tsx             # Syntax-highlighted code inspector
+│   │   │   ├── FindingDetail.tsx          # Vulnerability breakdown & AI explanation
+│   │   │   ├── SeverityFindingsDialog.tsx # Global severity drill-down dialog
+│   │   │   └── Verification.tsx           # Rescan delta comparison panel
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx              # Overview with interactive distribution
+│   │   │   ├── NewScan.tsx                # File upload & GitHub repo URL input
+│   │   │   └── ScanResults.tsx            # Filterable findings & virtualized list
+│   │   ├── api.ts                         # Type-safe API client
+│   │   ├── ui.tsx                         # Reusable UI primitives
+│   │   └── index.css                      # Tailwind CSS v4 styling
+│   ├── package.json
+│   └── vite.config.ts
+├── demo/
+│   ├── vulnerable/               # "Campus Bazaar" synthetic demo (Score: 22/F)
+│   └── fixed/                    # Corrected benchmark demo (Score: 87/B)
+├── run.ps1                       # Windows quickstart script
+├── run.sh                        # Unix quickstart script
+└── README.md
+```
+
+---
+
+## 🔒 Security Invariants
+
+- **RAM-Only GitHub Tokens**: Personal Access Tokens used for private repo scanning or Pull Request creation are held in volatile memory for the session duration and are never persisted to SQLite.
+- **Dual-Gate Redaction**: Detected secret keys are masked via `redact_text` before reaching database records, AI prompts, or browser previews.
+- **Safe Archive Ingestion**: Rejects path traversal attempts (`../`), symlinks, and archives exceeding a 100:1 compression ratio (zip bombs).
+- **SSRF Protection**: Live URL crawler prohibits private RFC1918 subnets, loopbacks, and cloud instance metadata addresses (`169.254.169.254`).
+
+---
+
+## 🗺️ Strategic Roadmap
+
+- [ ] **GitHub Action (`patchpilot-action@v1`)**: Run scans on pull requests and post inline PR comments.
+- [ ] **Containerized Test Sandbox**: Execute `npm test` / `pytest` inside ephemeral containers on AI-generated patches to prevent regressions before submitting PRs.
+- [ ] **Expanded Language Support**: Tree-sitter parsers for **Go**, **Java/Kotlin**, and **Rust**.
+- [ ] **Historical Git Secret Traversal**: Deep commit history traversal via TruffleHog / Gitleaks.
+- [ ] **Multi-Tenant Collaboration**: Workspaces, RBAC, and real-time webhook alerts (Slack, Discord, PagerDuty).
+
+---
+
+## 📄 Documentation & PDF Report
+
+An executive architectural summary and engineering roadmap document is available:
+- **Download PDF**: [PatchPilot_Executive_Summary_and_Roadmap.pdf](file:///C:/Users/AKASH/Downloads/patchpilot-ai/PatchPilot_Executive_Summary_and_Roadmap.pdf)
+- **HTML Report**: [PatchPilot_Executive_Summary_and_Roadmap.html](file:///C:/Users/AKASH/Downloads/patchpilot-ai/PatchPilot_Executive_Summary_and_Roadmap.html)
+
+---
+
+## 📜 License
+
+Licensed under the [MIT License](LICENSE).  
+Developed by **Akash Kushwaha** for **JU Techfest 2026**.

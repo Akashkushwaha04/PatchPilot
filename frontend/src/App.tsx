@@ -46,47 +46,55 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-teal focus:px-3 focus:py-2 focus:text-ink">Skip to content</a>
-      <div className="flex min-h-full">
-        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line-soft bg-hull/70 px-4 py-6 lg:flex">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-teal focus:px-3 focus:py-2 focus:text-ink">Skip to content</a>
+      <div className="flex min-h-full p-2.5 sm:p-4 lg:p-6 gap-6">
+        {/* Floating Spatial Sidebar */}
+        <aside className="sticky top-6 hidden h-[calc(100vh-3rem)] w-64 shrink-0 flex-col liquid-panel p-5 lg:flex shadow-2xl">
           <Logo />
           <p className="mt-3 text-xs leading-relaxed text-muted">Find vulnerabilities. Fix them with AI. Verify every fix.</p>
-          <nav className="mt-8 flex flex-col gap-1" aria-label="Main">
+          <nav className="mt-8 flex flex-col gap-1.5" aria-label="Main">
             {NAV.map(({ path, label, icon: Icon }) => (
               <a key={path} href={`#${path}`} aria-current={active === path ? "page" : undefined}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${active === path ? "bg-raised text-fg" : "text-muted hover:bg-raised/60 hover:text-fg"}`}>
+                className={`flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm transition-all duration-200 ${
+                  active === path
+                    ? "liquid-pill-active font-semibold shadow-md"
+                    : "text-muted hover:bg-white/10 hover:text-fg"
+                }`}>
                 <Icon className={`size-4 ${active === path ? "text-teal" : ""}`} /> {label}
               </a>
             ))}
           </nav>
-          <div className="mt-auto space-y-2 rounded-lg border border-line-soft p-3 text-xs text-muted">
+          <div className="mt-auto space-y-2 rounded-2xl border border-white/10 bg-white/5 p-3.5 text-xs text-muted backdrop-blur-md">
             <div className="flex items-center gap-2">
-              <span className={`size-2 rounded-full ${offline ? "bg-crit" : health ? "bg-teal" : "bg-dim"}`} />
+              <span className={`size-2 rounded-full ${offline ? "bg-crit shadow-[0_0_8px_var(--color-crit)]" : health ? "bg-teal shadow-[0_0_8px_var(--color-teal)]" : "bg-dim"}`} />
               {offline ? "Scanner offline" : health ? `Scanner online · ${health.rules} rules` : "Connecting"}
             </div>
-            <div>AI explanations: {health?.ai_provider ? <span className="text-fg">{health.ai_provider}</span> : "built-in (no AI key set)"}</div>
+            <div>AI explanations: {health?.ai_provider ? <span className="text-fg font-medium">{health.ai_provider}</span> : "built-in (no AI key set)"}</div>
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-line-soft px-4 py-3 lg:hidden">
+          {/* Mobile Liquid Header */}
+          <header className="flex items-center justify-between liquid-panel mb-3 px-4 py-3 lg:hidden">
             <Logo />
-            <button onClick={() => go("/new")} className="rounded-lg bg-teal px-3 py-1.5 text-sm font-semibold text-ink">New scan</button>
+            <button onClick={() => go("/new")} className="liquid-btn-primary px-3.5 py-1.5 text-sm font-semibold">New scan</button>
           </header>
-          <nav className="flex gap-1 overflow-x-auto border-b border-line-soft px-3 py-2 lg:hidden" aria-label="Main mobile">
+          <nav className="flex gap-1.5 overflow-x-auto liquid-pill-container mb-4 p-1.5 lg:hidden" aria-label="Main mobile">
             {NAV.map(({ path, label }) => (
-              <a key={path} href={`#${path}`} className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm ${active === path ? "bg-raised text-fg" : "text-muted"}`}>{label}</a>
+              <a key={path} href={`#${path}`} className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition-all ${active === path ? "liquid-pill-active font-semibold" : "text-muted hover:text-fg"}`}>{label}</a>
             ))}
           </nav>
           {offline && (
-            <div className="border-b border-crit/30 bg-crit/10 px-6 py-2 text-sm">
+            <div className="rounded-2xl border border-crit/30 bg-crit/15 px-6 py-2.5 text-sm mb-4 backdrop-blur-md">
               The PatchPilot API is not reachable. Start the backend with <code className="font-mono">uvicorn app.main:app --port 8000</code> in the backend folder.
             </div>
           )}
-          <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-8 sm:py-8">{page}</main>
-          <footer className="flex items-center gap-2 px-8 pb-6 text-xs text-dim">
-            <ShieldCheck className="size-3.5" />
-            Automated findings require human review. A clean scan does not prove an application is secure.
+          <main id="main" className="mx-auto w-full max-w-[1440px] flex-1 pb-6">{page}</main>
+          <footer className="flex items-center justify-between px-2 pt-4 pb-2 text-xs text-dim">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-3.5 text-teal" />
+              Automated findings require human review. A clean scan does not prove an application is secure.
+            </div>
           </footer>
         </div>
       </div>

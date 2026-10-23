@@ -172,25 +172,25 @@ export default function ScanResults({ scanId }: { scanId: string }) {
                     isActive
                       ? {
                           borderColor: SEV_COLOR[s],
-                          boxShadow: `0 0 0 2px var(--color-hull), 0 0 0 4px ${SEV_COLOR[s]}`,
-                          backgroundColor: `color-mix(in srgb, ${SEV_COLOR[s]} 16%, transparent)`,
+                          boxShadow: `0 0 0 1px rgba(255,255,255,0.2), 0 8px 24px -4px rgba(0,0,0,0.4)`,
+                          backgroundColor: `color-mix(in srgb, ${SEV_COLOR[s]} 20%, rgba(255,255,255,0.08))`,
                         }
                       : undefined
                   }
-                  className={`group relative flex flex-col justify-between rounded-xl border p-3 text-left cursor-pointer transition-all duration-200 transform hover:scale-105 hover:opacity-80 ${
+                  className={`group relative flex flex-col justify-between rounded-2xl border p-3.5 text-left cursor-pointer transition-all duration-200 backdrop-blur-xl ${
                     isActive
-                      ? "scale-105 shadow-lg"
-                      : `border-line-soft bg-hull/40 hover:border-line hover:bg-raised/60 ${count === 0 ? "opacity-60" : ""}`
+                      ? "scale-105"
+                      : `border-white/10 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.08] ${count === 0 ? "opacity-50" : ""}`
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-                      <span className="size-2 rounded-full" style={{ background: SEV_COLOR[s] }} />
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-white/90">
+                      <span className="size-2 rounded-full shadow-[0_0_8px_currentColor]" style={{ background: SEV_COLOR[s], color: SEV_COLOR[s] }} />
                       {SEV_LABEL[s]}
                     </span>
                     {isActive && (
                       <span
-                        className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                        className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-sm"
                         style={{
                           color: SEV_COLOR[s],
                           backgroundColor: `color-mix(in srgb, ${SEV_COLOR[s]} 25%, transparent)`,
@@ -200,14 +200,14 @@ export default function ScanResults({ scanId }: { scanId: string }) {
                       </span>
                     )}
                   </div>
-                  <div className="mt-2 flex items-baseline justify-between">
+                  <div className="mt-2.5 flex items-baseline justify-between">
                     <span
-                      className="text-2xl font-extrabold tabular-nums"
+                      className="text-2xl font-black tabular-nums tracking-tight"
                       style={isActive ? { color: SEV_COLOR[s] } : undefined}
                     >
                       {count}
                     </span>
-                    <span className="text-[11px] text-dim group-hover:text-muted">
+                    <span className="text-[11px] text-muted group-hover:text-white">
                       {count === 1 ? "issue" : "issues"}
                     </span>
                   </div>
@@ -340,8 +340,8 @@ export default function ScanResults({ scanId }: { scanId: string }) {
                           paddingBottom: "8px",
                         }}
                       >
-                        <div className={`group flex rounded-xl border transition-colors ${f.id === selectedId ? "border-teal/60 bg-raised" : "border-line-soft bg-panel/70 hover:border-line"}`}>
-                          <span className="w-1 shrink-0 rounded-l-xl" style={{ background: SEV_COLOR[f.severity] }} />
+                        <div className={`group flex rounded-2xl border transition-all duration-200 backdrop-blur-xl ${f.id === selectedId ? "border-white/30 bg-white/18 shadow-xl" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20"}`}>
+                          <span className="w-1.5 shrink-0 rounded-l-2xl shadow-[0_0_8px_currentColor]" style={{ background: SEV_COLOR[f.severity], color: SEV_COLOR[f.severity] }} />
                           <label className="flex items-start px-3 pt-4">
                             <span className="sr-only">Include in fix prompt</span>
                             <input type="checkbox" checked={checked.has(f.id)} onChange={() => toggleCheck(f.id)} disabled={f.status === "fixed"} className="accent-[var(--color-teal)]" />
@@ -352,7 +352,7 @@ export default function ScanResults({ scanId }: { scanId: string }) {
                               <KindBadge kind={f.kind} />
                               {f.status !== "open" && <StatusBadge status={f.status} />}
                             </span>
-                            <span className={`mt-1.5 block font-semibold ${f.status === "fixed" ? "text-muted line-through decoration-dim" : ""}`}>{f.title}</span>
+                            <span className={`mt-1.5 block font-semibold ${f.status === "fixed" ? "text-muted line-through decoration-dim" : "text-white/95"}`}>{f.title}</span>
                             <span className="mt-0.5 block truncate font-mono text-xs text-muted">{f.file}:{f.line} · {f.rule_id}</span>
                           </button>
                         </div>
@@ -411,11 +411,20 @@ export default function ScanResults({ scanId }: { scanId: string }) {
           </div>
 
           <div className="xl:sticky xl:top-6 xl:self-start">
-            <Panel className="overflow-hidden">
-              {selected
-                ? <FindingDetail scanId={scan.id} finding={selected} allFindings={findings} onStatus={updateFinding} onFixPrompt={setPromptIds} />
-                : <p className="p-10 text-center text-sm text-muted">Select a finding to see its evidence and fix.</p>}
-            </Panel>
+            {selected ? (
+              <FindingDetail
+                scanId={scan.id}
+                finding={selected}
+                allFindings={findings}
+                onStatus={updateFinding}
+                onFixPrompt={setPromptIds}
+                onClose={() => setSelectedId(null)}
+              />
+            ) : (
+              <Panel className="p-12 text-center text-sm text-muted">
+                <p>Select a finding to inspect evidence, view code diff, and correct security flaws.</p>
+              </Panel>
+            )}
           </div>
         </div>
       )}

@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0b1424;
-  --color-hull: #0f1b30;
-  --color-panel: #13213a;
-  --color-raised: #182a48;
-  --color-line: #223658;
-  --color-line-soft: #1a2b48;
-  --color-fg: #e4ecf7;
-  --color-muted: #8da2c0;
-  --color-dim: #62779a;
-  --color-teal: #2fd3b5;
-  --color-teal-deep: #15937f;
-  --color-sky: #5aa2ff;
-  --color-crit: #ff5468;
-  --color-high: #ff9a3d;
-  --color-med: #f2c94c;
-  --color-low: #6fa8ff;
-  --color-info: #8da2c0;
+  --color-ink: #070e17;
+  --color-hull: rgba(14, 25, 42, 0.72);
+  --color-panel: rgba(18, 32, 54, 0.65);
+  --color-raised: rgba(28, 48, 78, 0.55);
+  --color-line: rgba(255, 255, 255, 0.14);
+  --color-line-soft: rgba(255, 255, 255, 0.08);
+  --color-fg: #f3f7fc;
+  --color-muted: #9bb0cd;
+  --color-dim: #6c83a5;
+  --color-teal: #36e2c3;
+  --color-teal-deep: #129e88;
+  --color-sky: #4aa5ff;
+  --color-crit: #ff526b;
+  --color-high: #ff9d42;
+  --color-med: #f7ce46;
+  --color-low: #68adff;
+  --color-info: #9bb0cd;
   --font-sans: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
@@ -30,9 +30,13 @@ body,
 
 body {
   background-color: var(--color-ink);
+  /* Liquid Spatial Ambient Backdrop inspired by VisionOS natural organic environment */
   background-image:
-    radial-gradient(1200px 600px at 85% -10%, rgba(90, 162, 255, 0.08), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(47, 211, 181, 0.06), transparent 60%);
+    radial-gradient(1000px 600px at 50% -10%, rgba(54, 226, 195, 0.14), transparent 70%),
+    radial-gradient(900px 700px at 10% 30%, rgba(26, 68, 52, 0.38), transparent 70%),
+    radial-gradient(1100px 800px at 90% 40%, rgba(18, 45, 68, 0.45), transparent 70%),
+    radial-gradient(1200px 900px at 50% 110%, rgba(12, 42, 38, 0.35), transparent 70%),
+    linear-gradient(180deg, #050a12 0%, #08121f 50%, #060e19 100%);
   background-attachment: fixed;
   color: var(--color-fg);
   font-family: var(--font-sans);
@@ -43,16 +47,126 @@ body {
 :focus-visible {
   outline: 2px solid var(--color-teal);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 12px;
 }
 
 ::selection {
-  background: rgba(47, 211, 181, 0.3);
+  background: rgba(54, 226, 195, 0.35);
+  color: #ffffff;
+}
+
+/* ------------------------------------------------------------------ Liquid Display Utilities */
+
+.liquid-panel {
+  background: rgba(18, 32, 54, 0.58);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 24px 60px -12px rgba(0, 0, 0, 0.55),
+    0 2px 8px 0 rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.25);
+  border-radius: 26px;
+}
+
+.liquid-card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 12px 32px -4px rgba(0, 0, 0, 0.35),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+}
+
+.liquid-pill-container {
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+.liquid-pill-active {
+  background: rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.45);
+  color: #ffffff;
+}
+
+.liquid-btn-primary {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.18) 100%);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow:
+    0 8px 24px -4px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.5);
+  color: #ffffff;
+  border-radius: 16px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.liquid-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.24) 100%);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 10px 28px -4px rgba(0, 0, 0, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.liquid-btn-secondary {
+  background: rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.2),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 16px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.liquid-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  transform: translateY(-1px);
 }
 
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-line) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+}
+
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
 }
 
 @keyframes sweep {
@@ -61,12 +175,12 @@ body {
 }
 
 @keyframes rise {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
   to { opacity: 1; transform: none; }
 }
 
 .animate-rise {
-  animation: rise 0.28s ease-out both;
+  animation: rise 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -75,3 +189,4 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Bot, BookOpen, CheckCircle2, Code2, ExternalLink, Info, RefreshCcw, ShieldCheck, Sparkles, Wrench } from "lucide-react";
+import { Bot, BookOpen, CheckCircle2, Code2, ExternalLink, Play, RefreshCcw, ShieldCheck, Sparkles, Wrench, X } from "lucide-react";
 import { api, type Explanation, type Finding, type FindingCorrection, type ApplyFixResult, type Status } from "../api";
-import { Button, CopyButton, ErrorBanner, KindBadge, SeverityBadge, Spinner, StatusBadge, STATUS_LABEL, useToast } from "../ui";
+import { Button, CopyButton, ErrorBanner, KindBadge, SeverityBadge, Spinner, StatusBadge, STATUS_LABEL, SpatialHandle, useToast } from "../ui";
 import CodeViewer, { Snippet } from "./CodeViewer";
 
 const KIND_HELP: Record<Finding["kind"], string> = {
@@ -12,8 +12,8 @@ const KIND_HELP: Record<Finding["kind"], string> = {
 
 type Tab = "evidence" | "code" | "correct" | "explain";
 
-export default function FindingDetail({ scanId, finding, allFindings, onStatus, onFixPrompt }: {
-  scanId: string; finding: Finding; allFindings: Finding[]; onStatus: (f: Finding) => void; onFixPrompt: (ids: string[]) => void;
+export default function FindingDetail({ scanId, finding, allFindings, onStatus, onFixPrompt, onClose }: {
+  scanId: string; finding: Finding; allFindings: Finding[]; onStatus: (f: Finding) => void; onFixPrompt: (ids: string[]) => void; onClose?: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("evidence");
   const [exp, setExp] = useState<Explanation | null>(null);
@@ -86,76 +86,170 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
   };
 
   const firstLine = Math.max(1, finding.line - 2);
-  const tabs: [Tab, string, typeof Info][] = [
-    ["evidence", "Evidence and fix", BookOpen],
+  const tabs: [Tab, string, typeof BookOpen][] = [
+    ["evidence", "Info", BookOpen],
     ["code", "Code", Code2],
     ["correct", "Correct Code", CheckCircle2],
-    ["explain", "AI explanation", Sparkles],
+    ["explain", "AI Explain", Sparkles],
   ];
 
   return (
-    <article className="animate-rise" aria-label={`Finding detail: ${finding.title}`}>
-      <header className="space-y-3 border-b border-line-soft p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <SeverityBadge severity={finding.severity} />
-          <KindBadge kind={finding.kind} />
-          <StatusBadge status={finding.status} />
-          {finding.origin === "browser" && <span className="rounded-md bg-sky/10 px-2 py-0.5 text-xs text-sky">Browser-visible</span>}
-        </div>
-        <h2 className="text-xl font-bold leading-snug">{finding.title}</h2>
-        <p className="font-mono text-xs text-muted">{finding.file}:{finding.line} · {finding.rule_id}{finding.cwe && <> · <a className="hover:text-sky" target="_blank" rel="noreferrer noopener" href={`https://cwe.mitre.org/data/definitions/${finding.cwe.replace("CWE-", "")}.html`}>{finding.cwe} <ExternalLink className="inline size-3" /></a></>}</p>
-      </header>
+    <article className="animate-rise relative flex flex-col liquid-panel p-2 sm:p-5 overflow-hidden" aria-label={`Finding detail: ${finding.title}`}>
+      {/* Top VisionOS Liquid Navigation Bar */}
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4 px-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="size-9 shrink-0 rounded-full bg-white/12 hover:bg-white/22 active:scale-95 border border-white/20 backdrop-blur-xl flex items-center justify-center text-white/80 hover:text-white transition-all shadow-sm"
+          title="Close details"
+          aria-label="Close"
+        >
+          <X className="size-4" />
+        </button>
 
-      <div role="tablist" className="flex gap-1 border-b border-line-soft px-3">
-        {tabs.map(([key, label, Icon]) => (
-          <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
-            className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-3 text-sm ${tab === key ? "border-teal text-fg font-medium" : "border-transparent text-muted hover:text-fg"}`}>
-            <Icon className="size-4" /> {label}
-            {key === "correct" && <span className="rounded-full bg-teal/20 px-1.5 py-0.2 text-[10px] font-bold text-teal">Auto-fix</span>}
-          </button>
-        ))}
+        {/* Centered Segmented Control */}
+        <div role="tablist" className="liquid-pill-container p-1 flex items-center gap-1">
+          {tabs.map(([key, label, Icon]) => {
+            const isActive = tab === key;
+            return (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setTab(key)}
+                className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
+                  isActive
+                    ? "liquid-pill-active font-semibold shadow-md"
+                    : "text-white/60 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <Icon className="size-3.5" />
+                {label}
+                {key === "correct" && (
+                  <span className="size-1.5 rounded-full bg-teal animate-pulse" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="w-9 shrink-0" aria-hidden="true" />
       </div>
 
-      <div className="space-y-5 p-5">
+      {/* VisionOS Floating Media Header (Astonishing Style Row) */}
+      <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
+        <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)_auto] gap-4 items-center">
+          {/* Left Thumbnail / Code Preview Box */}
+          <div className="h-28 rounded-xl overflow-hidden border border-white/15 bg-black/40 p-2 font-mono text-[10px] text-muted flex flex-col justify-between shadow-inner relative group">
+            <div className="flex items-center justify-between text-dim border-b border-white/10 pb-1">
+              <span className="truncate max-w-[120px]">{finding.file.split("/").pop()}</span>
+              <span className="text-teal font-semibold">:{finding.line}</span>
+            </div>
+            <pre className="overflow-hidden leading-tight text-white/80 select-none opacity-90 line-clamp-3">
+              {finding.snippet || finding.evidence}
+            </pre>
+            <div className="flex items-center justify-between text-[9px] text-dim pt-1 border-t border-white/5">
+              <span>{finding.rule_id}</span>
+              <span className="text-teal/80 font-bold uppercase">{finding.severity}</span>
+            </div>
+          </div>
+
+          {/* Middle Synopsis & Metadata */}
+          <div className="space-y-1.5 min-w-0">
+            <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white leading-snug truncate">
+              {finding.title}
+            </h2>
+            <p className="text-xs text-white/70 line-clamp-2 leading-relaxed">
+              {finding.evidence || finding.impact}
+            </p>
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-white/60">
+              <span className="font-medium text-white/80">{finding.category || "Security"}</span>
+              <span>·</span>
+              <span className="font-mono">{finding.file}:{finding.line}</span>
+              <span>·</span>
+              <SeverityBadge severity={finding.severity} compact />
+              <KindBadge kind={finding.kind} />
+              <StatusBadge status={finding.status} />
+              {finding.cwe && (
+                <a
+                  className="rounded-full border border-white/20 bg-white/5 px-2 py-0.5 text-[11px] font-mono text-white/80 hover:text-teal hover:border-teal/40 transition-colors inline-flex items-center gap-1"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  href={`https://cwe.mitre.org/data/definitions/${finding.cwe.replace("CWE-", "")}.html`}
+                >
+                  {finding.cwe} <ExternalLink className="size-2.5" />
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Right Action Glass Buttons (VisionOS Style Vertical Stack) */}
+          <div className="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setTab("correct");
+                if (!correction) loadCorrection();
+              }}
+              className="liquid-btn-primary px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-2 shadow-lg"
+            >
+              <Play className="size-3.5 fill-current text-teal" />
+              <span>Correct the Code</span>
+            </button>
+            <button
+              onClick={() => onFixPrompt([finding.id])}
+              className="liquid-btn-secondary px-4 py-2 text-xs font-medium flex items-center justify-center gap-2"
+            >
+              <Sparkles className="size-3.5 text-sky" />
+              <span>Fix Prompt</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Tab Panels */}
+      <div className="mt-4 flex-1 space-y-4">
         {tab === "evidence" && (
-          <>
-            <section>
-              <h3 className="text-sm font-semibold">Why this was flagged</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted">{finding.evidence}</p>
-              <p className="mt-2 text-xs text-dim">Confidence {finding.confidence}. {KIND_HELP[finding.kind]}</p>
+          <div className="space-y-4">
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-md">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">Flagged Evidence</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-fg">{finding.evidence}</p>
+              <p className="mt-2 text-xs text-dim">Confidence: {finding.confidence}. {KIND_HELP[finding.kind]}</p>
             </section>
-            <Snippet code={finding.snippet} firstLine={firstLine} highlight={finding.line} />
-            <section>
-              <h3 className="text-sm font-semibold">What could happen</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted">{finding.impact}</p>
+            <div className="rounded-2xl overflow-hidden border border-white/10 shadow-lg">
+              <Snippet code={finding.snippet} firstLine={firstLine} highlight={finding.line} />
+            </div>
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-md">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">Security Impact</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-fg">{finding.impact}</p>
             </section>
-            <section className="rounded-lg border border-teal/25 bg-teal/5 p-4">
-              <h3 className="flex items-center gap-2 text-sm font-semibold"><Wrench className="size-4 text-teal" /> Recommended fix</h3>
-              <p className="mt-1.5 text-sm leading-relaxed">{finding.remediation}</p>
+            <section className="rounded-2xl border border-teal/30 bg-teal/10 p-4 backdrop-blur-md">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-teal"><Wrench className="size-4" /> Recommended Remediation</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-fg/90">{finding.remediation}</p>
             </section>
-            <p className="text-xs text-dim">{finding.description}</p>
-          </>
+          </div>
         )}
 
-        {tab === "code" && <CodeViewer scanId={scanId} path={finding.file} focusLine={finding.line} findings={allFindings} />}
+        {tab === "code" && (
+          <div className="rounded-2xl overflow-hidden border border-white/10 shadow-lg">
+            <CodeViewer scanId={scanId} path={finding.file} focusLine={finding.line} findings={allFindings} />
+          </div>
+        )}
 
         {tab === "correct" && (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal/20 bg-teal/5 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal/30 bg-teal/10 p-4 backdrop-blur-md">
               <div>
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-fg">
                   <ShieldCheck className="size-5 text-teal" />
-                  Automated Code Correction
+                  Automated Security Fix
                 </h3>
                 <p className="mt-1 text-xs text-muted">
-                  Inspect the side-by-side security patch. PatchPilot generates exact replacements to neutralize security flaws while preserving application behavior.
+                  Inspect the side-by-side patch. PatchPilot generates exact replacements to neutralize vulnerabilities while preserving application functionality.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" onClick={loadCorrection} disabled={correctBusy} icon={<RefreshCcw className={`size-3.5 ${correctBusy ? "animate-spin" : ""}`} />}>
-                  Regenerate
-                </Button>
-              </div>
+              <Button variant="secondary" onClick={loadCorrection} disabled={correctBusy} icon={<RefreshCcw className={`size-3.5 ${correctBusy ? "animate-spin" : ""}`} />}>
+                Regenerate
+              </Button>
             </div>
 
             {correctBusy && <Spinner label="Generating code correction and diff..." />}
@@ -164,23 +258,23 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
             {correction && (
               <>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className={`rounded-md px-2 py-0.5 ${correction.source === "ai" ? "bg-sky/10 text-sky border border-sky/20" : "bg-teal/10 text-teal border border-teal/20"}`}>
+                  <span className={`rounded-full px-3 py-0.5 border ${correction.source === "ai" ? "bg-sky/15 text-sky border-sky/30" : "bg-teal/15 text-teal border-teal/30"}`}>
                     {correction.source === "ai" ? "AI-Powered Remediation" : "Deterministic Pattern Fix"}
                   </span>
                   <span className="text-muted">Target: <code className="font-mono text-fg">{correction.file}:{correction.line}</code></span>
                 </div>
 
                 {correction.explanation && (
-                  <div className="rounded-lg border border-line-soft bg-hull p-4 text-xs leading-relaxed text-muted">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-xs leading-relaxed text-muted backdrop-blur-md">
                     <p className="font-semibold text-fg mb-1">Security Impact & Rationale</p>
                     <p>{correction.explanation}</p>
                   </div>
                 )}
 
-                {/* Structured Diff Viewer */}
-                <div className="overflow-hidden rounded-lg border border-line bg-ink">
-                  <div className="flex items-center justify-between border-b border-line-soft bg-raised/60 px-4 py-2 text-xs">
-                    <span className="font-mono text-muted">
+                {/* Structured Diff Viewer with Liquid Styling */}
+                <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/50 shadow-2xl backdrop-blur-xl">
+                  <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs">
+                    <span className="font-mono text-white/80">
                       {correction.file} (Line {correction.line})
                     </span>
                     <div className="flex items-center gap-2">
@@ -203,10 +297,10 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
                             key={idx}
                             className={`flex px-3 transition-colors ${
                               isDel
-                                ? "bg-red/15 text-red-300 border-l-2 border-red-500"
+                                ? "bg-red-500/20 text-red-200 border-l-2 border-red-500"
                                 : isAdd
-                                ? "bg-emerald-500/15 text-emerald-300 border-l-2 border-emerald-500"
-                                : "text-muted hover:bg-raised/20"
+                                ? "bg-emerald-500/20 text-emerald-200 border-l-2 border-emerald-400"
+                                : "text-white/70 hover:bg-white/[0.03]"
                             }`}
                           >
                             <span className="w-8 shrink-0 select-none text-right text-xs opacity-40">
@@ -224,12 +318,12 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
                       })}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-line-soft p-3 font-mono text-xs">
+                    <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-white/10 p-3 font-mono text-xs">
                       <div>
                         <div className="text-[11px] font-semibold uppercase text-red-400 mb-1.5 flex items-center gap-1">
                           <span>🔴 Vulnerable Code</span>
                         </div>
-                        <pre className="bg-red/10 border border-red/20 rounded p-2 text-red-200 overflow-x-auto">
+                        <pre className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-red-200 overflow-x-auto">
                           {correction.original_line || correction.original_snippet}
                         </pre>
                       </div>
@@ -237,7 +331,7 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
                         <div className="text-[11px] font-semibold uppercase text-emerald-400 mb-1.5 flex items-center gap-1">
                           <span>🟢 Corrected Code</span>
                         </div>
-                        <pre className="bg-emerald-500/10 border border-emerald-500/20 rounded p-2 text-emerald-200 overflow-x-auto">
+                        <pre className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-emerald-200 overflow-x-auto">
                           {correction.fixed_line || correction.corrected_snippet}
                         </pre>
                       </div>
@@ -246,7 +340,7 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
                 </div>
 
                 {/* Apply Actions */}
-                <div className="rounded-lg border border-line-soft bg-hull/70 p-4">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold">Apply Fix Directly</p>
@@ -275,7 +369,7 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
                   </div>
 
                   {applyResult && (
-                    <div className="mt-4 rounded-lg border border-teal/30 bg-teal/10 p-3 text-xs text-fg">
+                    <div className="mt-4 rounded-2xl border border-teal/30 bg-teal/15 p-3 text-xs text-fg backdrop-blur-md">
                       <div className="flex items-center gap-2 font-semibold text-teal">
                         <CheckCircle2 className="size-4" />
                         {applyResult.message}
@@ -302,11 +396,11 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
         {tab === "explain" && (
           <div className="space-y-4">
             {!exp && !expBusy && (
-              <div className="rounded-lg border border-line-soft bg-hull/60 p-5 text-sm">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm backdrop-blur-md">
                 <p className="flex items-center gap-2 font-semibold"><Bot className="size-4 text-sky" /> Plain-language explanation</p>
                 <p className="mt-1.5 leading-relaxed text-muted">
                   Explains what the code does, why it's risky, a realistic attack, a safer version and how to verify the fix.
-                  Only the masked snippet is sent to the AI provider, and code comments are treated as untrusted data. Without an AI key, a built-in explanation is used.
+                  Without an AI key, a built-in explanation is used.
                 </p>
                 <Button className="mt-4" variant="primary" onClick={explain} icon={<Sparkles className="size-4" />}>Explain this finding</Button>
               </div>
@@ -316,23 +410,25 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
             {exp && (
               <>
                 <p className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className={`rounded-md px-2 py-0.5 ${exp.source === "ai" ? "bg-sky/10 text-sky" : "bg-raised text-muted"}`}>
+                  <span className={`rounded-full px-3 py-0.5 border ${exp.source === "ai" ? "bg-sky/15 text-sky border-sky/30" : "bg-white/10 text-muted border-white/15"}`}>
                     {exp.source === "ai" ? `AI-generated (${exp.provider})` : "Built-in explanation"}
                   </span>
-                  {exp.source === "ai" && <span className="text-dim">AI suggestion: verify before acting. The scanner finding itself is unchanged.</span>}
                 </p>
-                {exp.ai_error && <p className="rounded-lg border border-line bg-hull px-3 py-2 text-xs text-muted">{exp.ai_error}</p>}
+                {exp.ai_error && <p className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-muted">{exp.ai_error}</p>}
                 {([["What the code does", exp.explanation.what_the_code_does], ["Why it's risky", exp.explanation.why_risky], ["Realistic impact", exp.explanation.impact_example], ["Recommended fix", exp.explanation.recommended_fix]] as const).map(([h, t]) => (
-                  <section key={h}><h3 className="text-sm font-semibold">{h}</h3><p className="mt-1 text-sm leading-relaxed text-muted">{t}</p></section>
+                  <section key={h} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-md">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">{h}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-fg">{t}</p>
+                  </section>
                 ))}
                 {exp.explanation.safer_code_example && (
-                  <section>
-                    <h3 className="mb-1.5 text-sm font-semibold">Safer code</h3>
-                    <pre className="scroll-thin overflow-x-auto rounded-lg border border-teal/20 bg-ink p-3 font-mono text-[12.5px] leading-6 text-fg">{exp.explanation.safer_code_example}</pre>
+                  <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-md">
+                    <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">Safer code</h3>
+                    <pre className="scroll-thin overflow-x-auto rounded-xl border border-teal/20 bg-black/40 p-3 font-mono text-[12.5px] leading-6 text-fg">{exp.explanation.safer_code_example}</pre>
                   </section>
                 )}
-                <section>
-                  <h3 className="text-sm font-semibold">How to verify the fix</h3>
+                <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-md">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">How to verify the fix</h3>
                   <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-muted">{exp.explanation.verification_steps.map((s, i) => <li key={i}>{s}</li>)}</ul>
                 </section>
               </>
@@ -341,39 +437,36 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
         )}
       </div>
 
-      <footer className="space-y-3 border-t border-line-soft p-5">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="primary"
-            onClick={() => {
-              setTab("correct");
-              if (!correction) loadCorrection();
-            }}
-            icon={<Wrench className="size-4 text-emerald-400" />}
-          >
-            Correct the Code
-          </Button>
-          <Button variant="secondary" onClick={() => onFixPrompt([finding.id])} icon={<Sparkles className="size-4" />}>
-            Generate fix prompt
-          </Button>
-          <CopyButton text={finding.remediation_text} label="Copy remediation" done="Remediation copied" />
+      {/* Footer / Status */}
+      <footer className="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          {finding.status === "fixed" ? (
+            <p className="text-teal font-medium flex items-center gap-1.5">
+              <CheckCircle2 className="size-4" />
+              Verified fixed by rescan <a className="underline" href={`#/scans/${finding.verified_by}`}>{finding.verified_by}</a>
+            </p>
+          ) : (
+            <label className="flex items-center gap-2 text-muted">
+              <span>Status:</span>
+              <select
+                value={finding.status}
+                onChange={(e) => setStatus(e.target.value as Status)}
+                className="rounded-full border border-white/15 bg-black/40 px-3 py-1 text-xs text-white outline-none focus:border-teal backdrop-blur-md"
+              >
+                <option value="open">Open</option>
+                <option value="needs_review">Needs review</option>
+                <option value="accepted_risk">Accepted risk</option>
+              </select>
+            </label>
+          )}
         </div>
-        {finding.status === "fixed" ? (
-          <p className="text-xs text-teal">Verified fixed by rescan <a className="underline" href={`#/scans/${finding.verified_by}`}>{finding.verified_by}</a>. Status is locked.</p>
-        ) : (
-          <label className="flex items-center gap-3 text-sm text-muted">
-            Status
-            <select value={finding.status} onChange={(e) => setStatus(e.target.value as Status)}
-              className="rounded-lg border border-line bg-hull px-2.5 py-1.5 text-sm text-fg outline-none focus:border-teal">
-              <option value="open">Open</option>
-              <option value="needs_review">Needs review</option>
-              <option value="accepted_risk">Accepted risk</option>
-            </select>
-            <span className="text-xs text-dim">"Fixed" is set only by a verified rescan.</span>
-          </label>
-        )}
-        {statusErr && <ErrorBanner message={statusErr} />}
+        <CopyButton text={finding.remediation_text} label="Copy remediation" done="Remediation copied" />
       </footer>
+
+      {statusErr && <div className="mt-2"><ErrorBanner message={statusErr} /></div>}
+
+      {/* Bottom Spatial Drag Handle from VisionOS Preview */}
+      <SpatialHandle className="mt-2" />
     </article>
   );
 }

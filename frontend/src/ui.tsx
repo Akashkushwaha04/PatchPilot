@@ -42,25 +42,29 @@ export function timeAgo(iso: string): string {
 export function SeverityBadge({ severity, compact = false }: { severity: Severity; compact?: boolean }) {
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap"
-      style={{ color: SEV_COLOR[severity], background: `color-mix(in srgb, ${SEV_COLOR[severity]} 14%, transparent)` }}
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap border shadow-sm backdrop-blur-md transition-transform hover:scale-[1.02]"
+      style={{
+        color: SEV_COLOR[severity],
+        background: `color-mix(in srgb, ${SEV_COLOR[severity]} 18%, rgba(255,255,255,0.06))`,
+        borderColor: `color-mix(in srgb, ${SEV_COLOR[severity]} 35%, rgba(255,255,255,0.18))`,
+      }}
     >
-      <span className="size-1.5 rounded-full" style={{ background: SEV_COLOR[severity] }} />
+      <span className="size-1.5 rounded-full shadow-[0_0_8px_currentColor]" style={{ background: SEV_COLOR[severity] }} />
       {!compact && SEV_LABEL[severity]}
     </span>
   );
 }
 
 const STATUS_STYLE: Record<Status, string> = {
-  open: "text-fg bg-raised",
-  needs_review: "text-sky bg-sky/10",
-  accepted_risk: "text-muted bg-line/40",
-  fixed: "text-teal bg-teal/10",
+  open: "text-fg bg-white/10 border-white/15",
+  needs_review: "text-sky bg-sky/15 border-sky/30",
+  accepted_risk: "text-muted bg-white/5 border-white/10",
+  fixed: "text-teal bg-teal/15 border-teal/30",
 };
 
 export function StatusBadge({ status }: { status: Status }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap ${STATUS_STYLE[status]}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap backdrop-blur-md shadow-sm ${STATUS_STYLE[status]}`}>
       {status === "fixed" && <Check className="size-3" />}
       {STATUS_LABEL[status]}
     </span>
@@ -68,16 +72,16 @@ export function StatusBadge({ status }: { status: Status }) {
 }
 
 export function KindBadge({ kind }: { kind: Finding["kind"] }) {
-  const style = kind === "confirmed" ? "border-fg/25 text-fg" : kind === "heuristic" ? "border-line text-muted" : "border-dashed border-sky/50 text-sky";
-  return <span className={`rounded-md border px-2 py-0.5 text-xs whitespace-nowrap ${style}`}>{KIND_LABEL[kind]}</span>;
+  const style = kind === "confirmed" ? "border-white/25 text-fg bg-white/10" : kind === "heuristic" ? "border-white/15 text-muted bg-white/5" : "border-dashed border-sky/50 text-sky bg-sky/5";
+  return <span className={`rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap backdrop-blur-sm ${style}`}>{KIND_LABEL[kind]}</span>;
 }
 
 type BtnVariant = "primary" | "secondary" | "ghost" | "danger";
 const BTN: Record<BtnVariant, string> = {
-  primary: "bg-teal text-ink hover:bg-[#4be0c4] font-semibold",
-  secondary: "bg-raised text-fg border border-line hover:border-muted/60",
-  ghost: "text-muted hover:text-fg hover:bg-raised",
-  danger: "text-crit hover:bg-crit/10",
+  primary: "liquid-btn-primary font-semibold text-white",
+  secondary: "liquid-btn-secondary",
+  ghost: "text-muted hover:text-fg hover:bg-white/10 rounded-2xl",
+  danger: "bg-crit/15 text-crit border border-crit/30 hover:bg-crit/25 rounded-2xl",
 };
 
 export function Button({
@@ -87,7 +91,7 @@ export function Button({
     <button
       {...rest}
       disabled={rest.disabled || busy}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${BTN[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 ${BTN[variant]} ${className}`}
     >
       {busy ? <Loader2 className="size-4 animate-spin" /> : icon}
       {children}
@@ -96,7 +100,29 @@ export function Button({
 }
 
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-xl border border-line-soft bg-panel/80 ${className}`}>{children}</section>;
+  return <section className={`liquid-panel ${className}`}>{children}</section>;
+}
+
+export function SpatialHandle({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex items-center justify-center gap-2 py-2 select-none pointer-events-none opacity-60 hover:opacity-100 transition-opacity ${className}`} aria-hidden="true">
+      <div className="size-1.5 rounded-full bg-white/40 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
+      <div className="h-1 w-14 rounded-full bg-white/40 shadow-[0_0_6px_rgba(255,255,255,0.2)]" />
+    </div>
+  );
+}
+
+export function CloseGlassButton({ onClick, className = "", label = "Close" }: { onClick?: () => void; className?: string; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={`size-9 shrink-0 rounded-full bg-white/12 hover:bg-white/24 active:scale-95 border border-white/20 backdrop-blur-xl flex items-center justify-center text-white/80 hover:text-white transition-all shadow-sm ${className}`}
+    >
+      <X className="size-4" />
+    </button>
+  );
 }
 
 export function ErrorBanner({ message, onDismiss }: { message: string; onDismiss?: () => void }) {

@@ -1,0 +1,32 @@
+services:
+  patchpilot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: patchpilot:latest
+    container_name: patchpilot-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - PATCHPILOT_URL_SCAN=1
+      # Optional: Add your frontier AI provider keys below
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    volumes:
+      - patchpilot-data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+volumes:
+  patchpilot-data:
+    name: patchpilot_db_data

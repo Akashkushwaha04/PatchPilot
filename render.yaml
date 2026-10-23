@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: patchpilot-ai
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: PATCHPILOT_URL_SCAN
+        value: 1
+      - key: PATCHPILOT_DB
+        value: /app/data/patchpilot.db

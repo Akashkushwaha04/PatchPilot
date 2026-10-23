@@ -668,7 +668,9 @@ def scoring():
 
 @app.get("/api/download/summary-pdf", tags=["system"])
 def download_summary_pdf():
-    pdf_path = Path("C:/Users/AKASH/Downloads/patchpilot-ai/PatchPilot_Executive_Summary_and_Roadmap.pdf")
+    pdf_path = Path(__file__).resolve().parent.parent.parent / "PatchPilot_Executive_Summary_and_Roadmap.pdf"
+    if not pdf_path.is_file():
+        pdf_path = Path("C:/Users/AKASH/Downloads/patchpilot-ai/PatchPilot_Executive_Summary_and_Roadmap.pdf")
     if not pdf_path.is_file():
         raise HTTPException(404, "PDF report not found.")
     return FileResponse(
@@ -680,7 +682,12 @@ def download_summary_pdf():
 
 # ------------------------------------------------------------------ frontend
 
-DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+DIST = Path(os.getenv("PATCHPILOT_FRONTEND_DIST", Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"))
+if not DIST.is_dir():
+    candidate_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    if candidate_dist.is_dir():
+        DIST = candidate_dist
+
 if DIST.is_dir():
     app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
 

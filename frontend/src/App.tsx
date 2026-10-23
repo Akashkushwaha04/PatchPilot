@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { FlaskConical, History, LayoutDashboard, Menu, PanelLeftClose, Plus, ShieldCheck, X } from "lucide-react";
-import { api, type Health } from "./api";
+import { api } from "./api";
 import { ToastProvider, go, useRoute } from "./ui";
 import Dashboard from "./pages/Dashboard";
 import NewScan from "./pages/NewScan";
@@ -33,7 +33,6 @@ export function Logo({ showText = true }: { showText?: boolean }) {
 
 export default function App() {
   const route = useRoute();
-  const [health, setHealth] = useState<Health | null>(null);
   const [offline, setOffline] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
@@ -55,7 +54,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    api.health().then(setHealth).catch(() => setOffline(true));
+    api.health().catch(() => setOffline(true));
   }, []);
 
   const scanMatch = route.match(/^\/scans\/([\w-]+)/);
@@ -134,23 +133,6 @@ export default function App() {
               );
             })}
           </nav>
-
-          {/* Status Box */}
-          <div className={`mt-auto rounded-2xl border border-white/10 bg-white/5 text-xs text-muted backdrop-blur-md transition-all ${sidebarOpen ? "p-3.5 space-y-2 w-full animate-rise" : "p-2 flex flex-col items-center"}`}>
-            <div className="flex items-center gap-2" title={offline ? "Scanner offline" : health ? `Scanner online · ${health.rules} rules` : "Connecting"}>
-              <span className={`size-2.5 rounded-full shrink-0 ${offline ? "bg-crit shadow-[0_0_8px_var(--color-crit)]" : health ? "bg-teal shadow-[0_0_8px_var(--color-teal)]" : "bg-dim"}`} />
-              {sidebarOpen && (
-                <span className="truncate">
-                  {offline ? "Scanner offline" : health ? `Scanner online · ${health.rules} rules` : "Connecting"}
-                </span>
-              )}
-            </div>
-            {sidebarOpen && (
-              <div className="truncate text-[11px] text-white/60">
-                AI: {health?.ai_provider ? <span className="text-fg font-medium">{health.ai_provider}</span> : "built-in (no key set)"}
-              </div>
-            )}
-          </div>
         </aside>
 
         {/* Main Content Area */}

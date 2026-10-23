@@ -609,6 +609,18 @@ def scoring():
     return {"method": METHOD}
 
 
+@app.get("/api/download/summary-pdf", tags=["system"])
+def download_summary_pdf():
+    pdf_path = Path("C:/Users/AKASH/Downloads/patchpilot-ai/PatchPilot_Executive_Summary_and_Roadmap.pdf")
+    if not pdf_path.is_file():
+        raise HTTPException(404, "PDF report not found.")
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename="PatchPilot_Executive_Summary_and_Roadmap.pdf",
+    )
+
+
 # ------------------------------------------------------------------ frontend
 
 DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"

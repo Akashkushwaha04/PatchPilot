@@ -2,6 +2,7 @@
 
 **Autonomous Security Reviewer, Multi-AI Model Security Engine, Auto-Remediation & Fix Verification Platform**
 
+[![Live App](https://img.shields.io/badge/Live%20App-onrender.com-00c7b7?style=for-the-badge&logo=render)](https://patchpilot-ai-nelv.onrender.com)
 [![Tests](https://img.shields.io/badge/tests-119%20passed-10b981?style=for-the-badge&logo=pytest)](https://github.com/Akashkushwaha04/PatchPilot)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.10+-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/Frontend-React%2018%20%7C%20Tailwind%20v4-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
@@ -337,3 +338,4 @@ patchpilot/
 
 Licensed under the [MIT License](LICENSE).  
 Developed by **Akash Kushwaha** **Aman Kushwaha** **Narayan Mali** **Himanshu Tyagi** for **JU Techfest 2026**.
+

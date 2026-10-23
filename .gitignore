@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+.pytest_cache/
+backend/data/
+.env
+.env.*
+!.env.example
+# The demo project's .env is intentionally committed: it is synthetic test data.
+!demo/vulnerable/.env

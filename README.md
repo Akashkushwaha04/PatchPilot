@@ -336,4 +336,4 @@ patchpilot/
 ## 📜 License
 
 Licensed under the [MIT License](LICENSE).  
-Developed by **Akash Kushwaha** for **JU Techfest 2026**.
+Developed by **Akash Kushwaha** **Aman Kushwaha** **Narayan Mali** **Himanshu Tyagi** for **JU Techfest 2026**.

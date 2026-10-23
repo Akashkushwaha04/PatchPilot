@@ -1,9 +1,35 @@
 import { useEffect, useState } from "react";
-import { FileArchive, FlaskConical, GitBranch, Globe, Lock, ScanLine } from "lucide-react";
-import { api, uploadForm, type Health, type Scan } from "../api";
+import {
+  Binary,
+  Brain,
+  Cpu,
+  FileArchive,
+  FlaskConical,
+  GitBranch,
+  Globe,
+  Lock,
+  ScanLine,
+  Shield,
+  Sparkles,
+  Zap,
+} from "lucide-react";
+import { api, uploadForm, type AIModel, type Health, type Scan } from "../api";
 import Uploader, { Progress, appendSelection, type Selection } from "../components/Uploader";
 import { Button, ErrorBanner, Panel, go } from "../ui";
 import { useDemoLauncher } from "./Dashboard";
+
+function renderModelIcon(icon: string) {
+  switch (icon) {
+    case "sparkles": return <Sparkles className="size-5 text-teal" />;
+    case "shield": return <Shield className="size-5 text-sky" />;
+    case "brain": return <Brain className="size-5 text-purple-300" />;
+    case "binary": return <Binary className="size-5 text-emerald-400" />;
+    case "zap": return <Zap className="size-5 text-amber-300" />;
+    case "lock": return <Lock className="size-5 text-teal" />;
+    case "cpu": return <Cpu className="size-5 text-slate-300" />;
+    default: return <Sparkles className="size-5 text-teal" />;
+  }
+}
 
 export default function NewScan() {
   const [name, setName] = useState("");
@@ -18,10 +44,19 @@ export default function NewScan() {
   const [phase, setPhase] = useState<"idle" | "uploading" | "fetching" | "scanning">("idle");
   const [pct, setPct] = useState(0);
   const [health, setHealth] = useState<Health | null>(null);
+  const [models, setModels] = useState<AIModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>("claude-3-7-sonnet");
   const demo = useDemoLauncher();
   const busy = phase !== "idle";
 
-  useEffect(() => { api.health().then(setHealth).catch(() => {}); }, []);
+  useEffect(() => {
+    api.health().then(setHealth).catch(() => {});
+    api.models().then((ms) => {
+      setModels(ms);
+      const def = ms.find((m) => m.is_default);
+      if (def) setSelectedModel(def.id);
+    }).catch(() => {});
+  }, []);
   useEffect(() => {
     if (!name && sel?.mode === "zip") setName(sel.archive.name.replace(/\.zip$/i, ""));
     if (!name && githubUrl.trim()) {
@@ -43,7 +78,8 @@ export default function NewScan() {
           githubUrl.trim(),
           githubToken.trim() || undefined,
           githubBranch.trim() || undefined,
-          name.trim() || undefined
+          name.trim() || undefined,
+          selectedModel
         );
         go(`/scans/${scan.id}`);
       } catch (err) {
@@ -57,6 +93,7 @@ export default function NewScan() {
     if (url.trim() && !authorized) return setError("Confirm you are authorized to assess this URL before scanning it.");
     const form = new FormData();
     form.append("project_name", name.trim());
+    form.append("ai_model", selectedModel);
     if (sel) appendSelection(form, sel);
     if (url.trim()) form.append("target_url", url.trim());
     setPhase("uploading");
@@ -177,7 +214,7 @@ export default function NewScan() {
           <div className="flex items-start gap-3">
             <Globe className="mt-0.5 size-5 text-sky" />
             <div>
-              <p className="text-sm font-semibold">Deployed URL <span className="font-normal text-muted">(optional)</span></p>
+              <p className="text-sm font-semibold">Deployed URL <span className="font-normal text-muted">(optional website check)</span></p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
                 Checks only what any visitor can download: the page HTML and same-site scripts, for exposed keys and risky patterns.
                 It never logs in, submits forms or attempts exploits, and it cannot assess your backend. Private, local and cloud-metadata addresses are blocked.
@@ -191,13 +228,102 @@ export default function NewScan() {
               <input value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} type="url" inputMode="url" placeholder="https://your-site.example"
                 aria-label="Deployed URL" className="w-full rounded-lg border border-line bg-hull px-3.5 py-2.5 text-sm outline-none placeholder:text-dim focus:border-teal" />
               {url.trim() && (
-                <label className="flex items-start gap-2.5 text-sm">
-                  <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="mt-1 accent-[var(--color-teal)]" />
-                  I own this site or have permission to assess it.
-                </label>
+                <div className="space-y-2 pt-1">
+                  <label className="flex items-start gap-2.5 text-sm">
+                    <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="mt-1 accent-[var(--color-teal)]" />
+                    I own this site or have permission to assess it.
+                  </label>
+                  <div className="flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/10 px-3 py-2 text-xs text-fg">
+                    <Sparkles className="size-4 shrink-0 text-teal" />
+                    <span>
+                      Target website will be assessed with <strong>{models.find(m => m.id === selectedModel)?.name || "Selected AI"}</strong> (<strong>Efficiency:</strong> {models.find(m => m.id === selectedModel)?.efficiency} • <strong>Speed:</strong> {models.find(m => m.id === selectedModel)?.speed}).
+                    </span>
+                  </div>
+                </div>
               )}
             </>
           )}
+        </Panel>
+
+        {/* AI Model Selection for Website & Code Security Analysis */}
+        <Panel className="space-y-4 p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Sparkles className="mt-0.5 size-5 text-teal" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold">Choose AI Security Engine</h3>
+                  <span className="rounded-full border border-teal/30 bg-teal/15 px-2.5 py-0.5 text-[10px] font-semibold text-teal">
+                    Multi-Model Audit
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  Choose which AI model inspects your website and codebase. Every model's detection efficiency and speed benchmark are displayed in front.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-1">
+            {models.map((m) => {
+              const active = selectedModel === m.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => !busy && setSelectedModel(m.id)}
+                  className={`group relative cursor-pointer rounded-2xl border p-4 transition-all ${
+                    active
+                      ? "border-teal/60 bg-teal/12 shadow-[0_4px_24px_rgba(167,199,203,0.18)]"
+                      : "border-line bg-hull/50 hover:border-line hover:bg-hull/80"
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-start gap-3.5">
+                      <div className={`mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl border ${
+                        active ? "border-teal/40 bg-teal/20 text-teal" : "border-line bg-raised/40 text-muted"
+                      }`}>
+                        {renderModelIcon(m.icon)}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-sm text-fg">{m.name}</span>
+                          <span className="text-[11px] text-muted">({m.provider})</span>
+                          {m.tag && (
+                            <span className="rounded-md border border-teal/40 bg-teal/20 px-1.5 py-0.5 text-[10px] font-bold text-teal">
+                              {m.tag}
+                            </span>
+                          )}
+                          <span className="rounded-md border border-line-soft bg-raised/30 px-1.5 py-0.5 text-[10px] text-muted">
+                            {m.badge}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted/90 line-clamp-1">{m.description}</p>
+                      </div>
+                    </div>
+
+                    {/* Efficiency & Speed prominently displayed in front */}
+                    <div className="flex flex-wrap items-center gap-2 md:shrink-0 md:pl-4">
+                      <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                        <Zap className="size-3 text-emerald-400" />
+                        <span>Efficiency: {m.efficiency}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 rounded-lg border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-xs font-semibold text-sky">
+                        <span>Speed: {m.speed}</span>
+                      </div>
+                      <input
+                        type="radio"
+                        name="ai_model"
+                        checked={active}
+                        onChange={() => setSelectedModel(m.id)}
+                        className="ml-1 size-4 accent-[var(--color-teal)]"
+                        disabled={busy}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </Panel>
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}

@@ -33,7 +33,7 @@ async def _save_scan_record_async(
     project_name: str, ingest: IngestResult | None, source_kind: str,
     findings: list[dict], *, parent_id: str | None = None,
     label: str | None = None, is_demo: bool = False, url_result: dict | None = None,
-    target_url: str | None = None
+    target_url: str | None = None, ai_model: str = "claude-3-7-sonnet"
 ) -> str:
     files = ingest.files if ingest else []
     if url_result:
@@ -76,12 +76,12 @@ async def _save_scan_record_async(
             await db.execute("UPDATE findings SET status='fixed', verified_by=?, updated_at=? WHERE id=?", (scan_id, db.now(), x["before"]["_id"]))
 
     await db.execute(
-        "INSERT INTO scans(id, project_name, created_at, parent_id, source_kind, label, file_count, skipped_json, score_json, counts_json, comparison_json, target_url, url_json, is_demo) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO scans(id, project_name, created_at, parent_id, source_kind, label, file_count, skipped_json, score_json, counts_json, comparison_json, target_url, url_json, is_demo, ai_model) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (scan_id, project_name, db.now(), parent_id, source_kind, label, len(files),
          json.dumps(ingest.skipped if ingest else []), json.dumps(score), json.dumps(counts),
          json.dumps(comparison) if comparison else None, target_url,
-         json.dumps({k: v for k, v in url_result.items() if k != "findings" and not k.startswith("_")}) if url_result else None, int(is_demo)),
+         json.dumps({k: v for k, v in url_result.items() if k != "findings" and not k.startswith("_")}) if url_result else None, int(is_demo), ai_model),
     )
     await db.executemany(
         "INSERT INTO findings(id, scan_id, seq, data_json, status, updated_at) VALUES (?,?,?,?,?,?)",
@@ -104,7 +104,7 @@ async def _save_scan_record_async(
 async def create_scan_async(
     project_name: str, ingest: IngestResult | None, source_kind: str, *, parent_id: str | None = None,
     label: str | None = None, is_demo: bool = False, url_result: dict | None = None,
-    target_url: str | None = None
+    target_url: str | None = None, ai_model: str = "claude-3-7-sonnet"
 ) -> str:
     """Non-blocking scan and insertion via aiosqlite and process pool."""
     files = ingest.files if ingest else []
@@ -113,7 +113,7 @@ async def create_scan_async(
     findings = [f.to_dict() for f in await scan_files_async(files, enable_sca=enable_sca)] if files else []
     return await _save_scan_record_async(
         project_name, ingest, source_kind, findings, parent_id=parent_id,
-        label=label, is_demo=is_demo, url_result=url_result, target_url=target_url,
+        label=label, is_demo=is_demo, url_result=url_result, target_url=target_url, ai_model=ai_model
     )
 
 
@@ -178,6 +178,7 @@ async def scan_summary(row) -> dict:
         "total_findings": sum(json.loads(row["counts_json"]).values()),
         "target_url": row["target_url"], "url_scan": db.loads(row["url_json"]),
         "comparison": db.loads(row["comparison_json"]),
+        "ai_model": row["ai_model"] if "ai_model" in row.keys() and row["ai_model"] else "claude-3-7-sonnet",
     }
 
 

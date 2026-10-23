@@ -188,6 +188,12 @@ def health():
                   url_scanning=os.getenv("PATCHPILOT_URL_SCAN", "1") == "1")
 
 
+@app.get("/api/models", tags=["system"])
+def get_ai_models():
+    """Return all available AI models with their efficiency, speed, and capabilities."""
+    return ai.get_model_catalog()
+
+
 @app.get("/api/limits", tags=["system"])
 def limits():
     return LIMITS
@@ -234,14 +240,26 @@ async def create_scan(
     archive: UploadFile | None = File(None, description="ZIP of the project source"),
     files: list[UploadFile] | None = File(None, description="Individual source files (use relative paths as filenames)"),
     target_url: str | None = Form(None, description="Optional deployed URL you are authorized to assess"),
+    ai_model: str = Form("claude-3-7-sonnet", description="Selected AI model for analysis"),
 ):
     name = _clean_name(project_name)
     ingest = await _ingest_upload(archive, files)
     url_result = await _url_scan_async(target_url.strip() if target_url else None)
     if ingest is None and url_result is None:
         raise HTTPException(422, "Upload a ZIP, at least one source file, or a deployed URL.")
+    
+    # Annotate website scan with chosen AI model details
+    if url_result:
+        catalog = ai.get_model_catalog()
+        chosen_meta = next((m for m in catalog if m["id"] == ai_model), catalog[0])
+        url_result["ai_model"] = chosen_meta["name"]
+        url_result["ai_model_id"] = chosen_meta["id"]
+        url_result["ai_efficiency"] = chosen_meta["efficiency"]
+        url_result["ai_speed"] = chosen_meta["speed"]
+        url_result["notes"].insert(0, f"Website audited by {chosen_meta['name']} (Efficiency: {chosen_meta['efficiency']} | Speed: {chosen_meta['speed']}).")
+
     kind = "url" if ingest is None else ("zip" if archive is not None and archive.filename else "files")
-    scan_id = await service.create_scan_async(name, ingest, kind, url_result=url_result, target_url=target_url or None)
+    scan_id = await service.create_scan_async(name, ingest, kind, url_result=url_result, target_url=target_url or None, ai_model=ai_model)
     row = await service.scan_row(scan_id)
     return await service.scan_summary(row)
 
@@ -255,6 +273,7 @@ class GitHubScanRequest(BaseModel):
     github_token: str | None = Field(None, description="Optional GitHub Personal Access Token (for private repos and PR creation)")
     branch: str | None = Field(None, description="Optional branch or tag name")
     project_name: str | None = Field(None, description="Optional custom project name")
+    ai_model: str | None = Field(default="claude-3-7-sonnet", description="Selected AI model for repository check")
 
 
 class AutofixRequest(BaseModel):
@@ -287,6 +306,7 @@ async def scan_github_repository(payload: GitHubScanRequest):
         source_kind="github",
         target_url=payload.repo_url.strip(),
         label=f"GitHub: {owner}/{repo_name} ({ref})",
+        ai_model=payload.ai_model or "claude-3-7-sonnet",
     )
 
     # Cache token and repo info IN MEMORY ONLY for this session (never persisted to DB)
@@ -491,16 +511,16 @@ async def get_file(scan_id: str, path: str = Query(..., max_length=500)):
 
 
 @app.post("/api/scans/{scan_id}/findings/{finding_id}/explain", response_model=ExplainResponse, tags=["ai"])
-async def explain(scan_id: str, finding_id: str):
+async def explain(scan_id: str, finding_id: str, model: str | None = Query(None)):
     await _require_scan(scan_id)
     f = await service.get_finding(scan_id, finding_id)
     if not f:
         raise HTTPException(404, "Finding not found.")
     fallback = deterministic_explanation(f)
-    provider = ai.get_provider()
+    provider = ai.get_provider(model)
     if provider is None:
         return ExplainResponse(source="deterministic", provider=None, explanation=Explanation(**fallback),
-                               ai_error="AI explanations are disabled (no provider configured). Showing the built-in explanation.")
+                               ai_error="AI explanations are disabled. Showing the built-in explanation.")
     try:
         exp = ai.explain_with_ai(f, provider)
         return ExplainResponse(source="ai", provider=provider.name, explanation=Explanation(**exp))
@@ -515,7 +535,7 @@ class ApplyFixRequest(BaseModel):
 
 
 @app.post("/api/scans/{scan_id}/findings/{finding_id}/correct", tags=["findings"])
-async def correct_finding(scan_id: str, finding_id: str):
+async def correct_finding(scan_id: str, finding_id: str, model: str | None = Query(None)):
     """Generate corrected code snippet, unified diff, and security explanation for a specific finding."""
     await _require_scan(scan_id)
     f = await service.get_finding(scan_id, finding_id)
@@ -526,7 +546,7 @@ async def correct_finding(scan_id: str, finding_id: str):
     file_rows = await db.query("SELECT content FROM files WHERE scan_id=? AND path=?", (scan_id, file_path))
     file_content = file_rows[0]["content"] if file_rows else f.get("snippet", "")
 
-    correction = await autofix.generate_finding_correction(f, file_content)
+    correction = await autofix.generate_finding_correction(f, file_content, model_id=model)
     return correction
 
 

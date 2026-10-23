@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS scans (
   id TEXT PRIMARY KEY, project_name TEXT NOT NULL, created_at TEXT NOT NULL,
   parent_id TEXT, source_kind TEXT NOT NULL, label TEXT, file_count INTEGER NOT NULL,
   skipped_json TEXT NOT NULL, score_json TEXT NOT NULL, counts_json TEXT NOT NULL,
-  comparison_json TEXT, target_url TEXT, url_json TEXT, is_demo INTEGER DEFAULT 0
+  comparison_json TEXT, target_url TEXT, url_json TEXT, is_demo INTEGER DEFAULT 0,
+  ai_model TEXT DEFAULT 'claude-3-7-sonnet'
 );
 CREATE TABLE IF NOT EXISTS findings (
   id TEXT PRIMARY KEY, scan_id TEXT NOT NULL, seq INTEGER NOT NULL, data_json TEXT NOT NULL,
@@ -67,6 +68,10 @@ async def get_db() -> aiosqlite.Connection:
                 await conn.execute("PRAGMA synchronous=NORMAL;")
                 await conn.execute("PRAGMA busy_timeout=5000;")
                 await conn.executescript(SCHEMA)
+                try:
+                    await conn.execute("ALTER TABLE scans ADD COLUMN ai_model TEXT DEFAULT 'claude-3-7-sonnet';")
+                except Exception:
+                    pass
                 await conn.commit()
                 _conn = conn
     return _conn

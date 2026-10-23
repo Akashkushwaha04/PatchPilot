@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Bot, BookOpen, CheckCircle2, Code2, ExternalLink, Play, RefreshCcw, ShieldCheck, Sparkles, Wrench, X } from "lucide-react";
-import { api, type Explanation, type Finding, type FindingCorrection, type ApplyFixResult, type Status } from "../api";
+import { api, type AIModel, type Explanation, type Finding, type FindingCorrection, type ApplyFixResult, type Status } from "../api";
 import { Button, CopyButton, ErrorBanner, KindBadge, SeverityBadge, Spinner, StatusBadge, STATUS_LABEL, SpatialHandle, useToast } from "../ui";
 import CodeViewer, { Snippet } from "./CodeViewer";
 
@@ -21,6 +21,9 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
   const [expErr, setExpErr] = useState<string | null>(null);
   const [statusErr, setStatusErr] = useState<string | null>(null);
 
+  const [models, setModels] = useState<AIModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>("claude-3-7-sonnet");
+
   const [correction, setCorrection] = useState<FindingCorrection | null>(null);
   const [correctBusy, setCorrectBusy] = useState(false);
   const [correctErr, setCorrectErr] = useState<string | null>(null);
@@ -28,6 +31,10 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
   const [applyResult, setApplyResult] = useState<ApplyFixResult | null>(null);
 
   const toast = useToast();
+
+  useEffect(() => {
+    api.models().then(setModels).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setExp(null);
@@ -44,11 +51,12 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
     }
   }, [tab, finding.id]);
 
-  const loadCorrection = async () => {
+  const loadCorrection = async (modelToUse?: string) => {
+    const m = modelToUse || selectedModel;
     setCorrectBusy(true);
     setCorrectErr(null);
     try {
-      const res = await api.correctFinding(scanId, finding.id);
+      const res = await api.correctFinding(scanId, finding.id, m);
       setCorrection(res);
     } catch (e) {
       setCorrectErr((e as Error).message);
@@ -70,10 +78,11 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
     }
   };
 
-  const explain = async () => {
+  const explain = async (modelToUse?: string) => {
+    const m = modelToUse || selectedModel;
     setExpBusy(true);
     setExpErr(null);
-    try { setExp(await api.explain(scanId, finding.id)); } catch (e) { setExpErr((e as Error).message); } finally { setExpBusy(false); }
+    try { setExp(await api.explain(scanId, finding.id, m)); } catch (e) { setExpErr((e as Error).message); } finally { setExpBusy(false); }
   };
 
   const setStatus = async (s: Status) => {
@@ -247,10 +256,37 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
                   Inspect the side-by-side patch. PatchPilot generates exact replacements to neutralize vulnerabilities while preserving application functionality.
                 </p>
               </div>
-              <Button variant="secondary" onClick={loadCorrection} disabled={correctBusy} icon={<RefreshCcw className={`size-3.5 ${correctBusy ? "animate-spin" : ""}`} />}>
+              <Button variant="secondary" onClick={() => loadCorrection()} disabled={correctBusy} icon={<RefreshCcw className={`size-3.5 ${correctBusy ? "animate-spin" : ""}`} />}>
                 Regenerate
               </Button>
             </div>
+
+            {/* AI Model Switcher for Code Correction */}
+            {models.length > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-line bg-hull/60 p-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-teal shrink-0" />
+                  <span className="font-semibold text-fg">AI Engine:</span>
+                  <span className="text-muted">Choose which model generates the fix</span>
+                </div>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => {
+                    const m = e.target.value;
+                    setSelectedModel(m);
+                    loadCorrection(m);
+                  }}
+                  disabled={correctBusy}
+                  className="rounded-lg border border-teal/30 bg-hull px-3 py-1.5 text-xs font-medium text-fg outline-none focus:border-teal"
+                >
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} (⚡ {m.efficiency} • ⏱️ {m.speed})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {correctBusy && <Spinner label="Generating code correction and diff..." />}
             {correctErr && <ErrorBanner message={correctErr} />}
@@ -395,14 +431,43 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
 
         {tab === "explain" && (
           <div className="space-y-4">
+            {/* AI Model Switcher for Explanations */}
+            {models.length > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-line bg-hull/60 p-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-teal shrink-0" />
+                  <span className="font-semibold text-fg">AI Engine:</span>
+                  <span className="text-muted">Analyze with chosen intelligence</span>
+                </div>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => {
+                    const m = e.target.value;
+                    setSelectedModel(m);
+                    explain(m);
+                  }}
+                  disabled={expBusy}
+                  className="rounded-lg border border-teal/30 bg-hull px-3 py-1.5 text-xs font-medium text-fg outline-none focus:border-teal"
+                >
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} (⚡ {m.efficiency} • ⏱️ {m.speed})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {!exp && !expBusy && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm backdrop-blur-md">
                 <p className="flex items-center gap-2 font-semibold"><Bot className="size-4 text-sky" /> Plain-language explanation</p>
                 <p className="mt-1.5 leading-relaxed text-muted">
                   Explains what the code does, why it's risky, a realistic attack, a safer version and how to verify the fix.
-                  Without an AI key, a built-in explanation is used.
+                  Uses <strong>{models.find(m => m.id === selectedModel)?.name || "selected AI model"}</strong> for contextual reasoning.
                 </p>
-                <Button className="mt-4" variant="primary" onClick={explain} icon={<Sparkles className="size-4" />}>Explain this finding</Button>
+                <Button className="mt-4" variant="primary" onClick={() => explain()} icon={<Sparkles className="size-4" />}>
+                  Explain with {models.find(m => m.id === selectedModel)?.name || "AI"}
+                </Button>
               </div>
             )}
             {expBusy && <Spinner label="Asking for an explanation" />}

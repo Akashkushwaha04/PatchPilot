@@ -56,8 +56,31 @@ export interface Scan {
   status_counts: Partial<Record<Status, number>>;
   total_findings: number;
   target_url: string | null;
-  url_scan: { resources: { url: string; type: string; bytes: number }[]; notes: string[]; final_url: string } | null;
+  url_scan: {
+    resources: { url: string; type: string; bytes: number }[];
+    notes: string[];
+    final_url: string;
+    ai_model?: string;
+    ai_model_id?: string;
+    ai_efficiency?: string;
+    ai_speed?: string;
+  } | null;
   comparison: Comparison | null;
+  ai_model?: string;
+}
+
+export interface AIModel {
+  id: string;
+  name: string;
+  provider: string;
+  efficiency: string;
+  speed: string;
+  badge: string;
+  tag?: string;
+  description: string;
+  icon: string;
+  has_api_key: boolean;
+  is_default?: boolean;
 }
 
 export interface Dashboard {
@@ -180,17 +203,20 @@ export const api = {
     get<GlobalFinding[]>(`/api/findings${severity ? `?severity=${encodeURIComponent(severity)}` : ""}`),
   files: (id: string) => get<{ path: string; size: number }[]>(`/api/scans/${id}/files`),
   file: (id: string, path: string) => get<{ path: string; content: string }>(`/api/scans/${id}/file?path=${encodeURIComponent(path)}`),
+  models: () => get<AIModel[]>("/api/models"),
   setStatus: (id: string, fid: string, status: Status) => send<Finding>(`/api/scans/${id}/findings/${fid}`, "PATCH", { status }),
-  explain: (id: string, fid: string) => send<Explanation>(`/api/scans/${id}/findings/${fid}/explain`, "POST"),
-  correctFinding: (id: string, fid: string) => send<FindingCorrection>(`/api/scans/${id}/findings/${fid}/correct`, "POST"),
+  explain: (id: string, fid: string, model?: string) =>
+    send<Explanation>(`/api/scans/${id}/findings/${fid}/explain${model ? `?model=${encodeURIComponent(model)}` : ""}`, "POST"),
+  correctFinding: (id: string, fid: string, model?: string) =>
+    send<FindingCorrection>(`/api/scans/${id}/findings/${fid}/correct${model ? `?model=${encodeURIComponent(model)}` : ""}`, "POST"),
   applyFindingFix: (id: string, fid: string, body?: { custom_replacement?: string; rescan?: boolean }) =>
     send<ApplyFixResult>(`/api/scans/${id}/findings/${fid}/apply`, "POST", body || {}),
   repairPrompt: (id: string, finding_ids: string[]) =>
     send<{ prompt: string; finding_count: number; notice: string }>(`/api/scans/${id}/repair-prompt`, "POST", { finding_ids }),
   demoScan: () => send<Scan>("/api/demo/scan", "POST"),
   demoRescan: (id: string) => send<Scan>(`/api/scans/${id}/rescan/demo`, "POST"),
-  scanGithub: (repo_url: string, github_token?: string, branch?: string, project_name?: string) =>
-    send<Scan>("/api/scans/github", "POST", { repo_url, github_token, branch, project_name }),
+  scanGithub: (repo_url: string, github_token?: string, branch?: string, project_name?: string, ai_model?: string) =>
+    send<Scan>("/api/scans/github", "POST", { repo_url, github_token, branch, project_name, ai_model }),
   autofix: (scanId: string, payload: { github_token?: string; branch_name?: string; finding_ids?: string[] }) =>
     send<AutofixResult>(`/api/scans/${scanId}/autofix`, "POST", payload),
   evaluation: () => get<Evaluation>("/api/evaluation"),

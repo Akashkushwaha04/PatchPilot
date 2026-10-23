@@ -356,13 +356,13 @@ def build_diff_lines(original_content: str, patched_content: str, target_line_no
     return all_diff[min_idx:max_idx]
 
 
-async def generate_finding_correction(finding: dict, file_content: str) -> dict:
+async def generate_finding_correction(finding: dict, file_content: str, model_id: str | None = None) -> dict:
     """Generate complete correction details, diffs, and security explanation for a single finding."""
     line_no = finding.get("line", 1)
     lines = file_content.splitlines()
     target_line = lines[line_no - 1] if 0 < line_no <= len(lines) else ""
-    provider = ai.get_provider()
-    source = "deterministic"
+    provider = ai.get_provider(model_id)
+    source = "ai" if provider else "deterministic"
     patched_content: str | None = None
     fixed_line: str | None = None
     explanation: str = ""

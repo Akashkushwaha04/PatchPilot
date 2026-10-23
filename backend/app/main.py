@@ -509,6 +509,43 @@ async def explain(scan_id: str, finding_id: str):
                                ai_error=f"{e} The scanner finding is unchanged; showing the built-in explanation.")
 
 
+class ApplyFixRequest(BaseModel):
+    custom_replacement: str | None = Field(None, description="Optional custom code replacement")
+    rescan: bool = Field(True, description="Whether to automatically run a verification rescan after applying the fix")
+
+
+@app.post("/api/scans/{scan_id}/findings/{finding_id}/correct", tags=["findings"])
+async def correct_finding(scan_id: str, finding_id: str):
+    """Generate corrected code snippet, unified diff, and security explanation for a specific finding."""
+    await _require_scan(scan_id)
+    f = await service.get_finding(scan_id, finding_id)
+    if not f:
+        raise HTTPException(404, "Finding not found.")
+
+    file_path = f.get("file", "")
+    file_rows = await db.query("SELECT content FROM files WHERE scan_id=? AND path=?", (scan_id, file_path))
+    file_content = file_rows[0]["content"] if file_rows else f.get("snippet", "")
+
+    correction = await autofix.generate_finding_correction(f, file_content)
+    return correction
+
+
+@app.post("/api/scans/{scan_id}/findings/{finding_id}/apply", tags=["findings"])
+async def apply_finding_fix(scan_id: str, finding_id: str, body: ApplyFixRequest = ApplyFixRequest()):
+    """Directly apply the security patch to the file in the database and optionally run verification rescan."""
+    await _require_scan(scan_id)
+    try:
+        result = await autofix.apply_finding_fix(
+            scan_id,
+            finding_id,
+            custom_replacement=body.custom_replacement,
+            auto_rescan=body.rescan,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.post("/api/scans/{scan_id}/repair-prompt", response_model=RepairResponse, tags=["ai"])
 async def repair_prompt(scan_id: str, body: RepairRequest):
     row = await _require_scan(scan_id)

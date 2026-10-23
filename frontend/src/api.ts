@@ -128,6 +128,37 @@ export interface GlobalFinding extends Finding {
   project_name: string;
 }
 
+export interface DiffLine {
+  type: "context" | "del" | "add";
+  old_line?: number | null;
+  new_line?: number | null;
+  text: string;
+}
+
+export interface FindingCorrection {
+  finding_id: string;
+  rule_id: string;
+  title: string;
+  file: string;
+  line: number;
+  original_line: string;
+  fixed_line: string;
+  original_snippet: string;
+  corrected_snippet: string;
+  diff: string;
+  diff_lines: DiffLine[];
+  explanation: string;
+  source: "ai" | "deterministic";
+  can_apply: boolean;
+}
+
+export interface ApplyFixResult {
+  success: boolean;
+  message: string;
+  file: string;
+  rescan_id?: string | null;
+}
+
 export interface AutofixResult {
   success: boolean;
   pr_url?: string;
@@ -151,6 +182,9 @@ export const api = {
   file: (id: string, path: string) => get<{ path: string; content: string }>(`/api/scans/${id}/file?path=${encodeURIComponent(path)}`),
   setStatus: (id: string, fid: string, status: Status) => send<Finding>(`/api/scans/${id}/findings/${fid}`, "PATCH", { status }),
   explain: (id: string, fid: string) => send<Explanation>(`/api/scans/${id}/findings/${fid}/explain`, "POST"),
+  correctFinding: (id: string, fid: string) => send<FindingCorrection>(`/api/scans/${id}/findings/${fid}/correct`, "POST"),
+  applyFindingFix: (id: string, fid: string, body?: { custom_replacement?: string; rescan?: boolean }) =>
+    send<ApplyFixResult>(`/api/scans/${id}/findings/${fid}/apply`, "POST", body || {}),
   repairPrompt: (id: string, finding_ids: string[]) =>
     send<{ prompt: string; finding_count: number; notice: string }>(`/api/scans/${id}/repair-prompt`, "POST", { finding_ids }),
   demoScan: () => send<Scan>("/api/demo/scan", "POST"),

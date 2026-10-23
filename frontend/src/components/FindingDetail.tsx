@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Bot, BookOpen, Code2, ExternalLink, Info, Sparkles, Wrench } from "lucide-react";
-import { api, type Explanation, type Finding, type Status } from "../api";
+import { Bot, BookOpen, CheckCircle2, Code2, ExternalLink, Info, RefreshCcw, ShieldCheck, Sparkles, Wrench } from "lucide-react";
+import { api, type Explanation, type Finding, type FindingCorrection, type ApplyFixResult, type Status } from "../api";
 import { Button, CopyButton, ErrorBanner, KindBadge, SeverityBadge, Spinner, StatusBadge, STATUS_LABEL, useToast } from "../ui";
 import CodeViewer, { Snippet } from "./CodeViewer";
 
@@ -10,7 +10,7 @@ const KIND_HELP: Record<Finding["kind"], string> = {
   review_candidate: "Not enough evidence to confirm. A person should check whether protection exists elsewhere.",
 };
 
-type Tab = "evidence" | "code" | "explain";
+type Tab = "evidence" | "code" | "correct" | "explain";
 
 export default function FindingDetail({ scanId, finding, allFindings, onStatus, onFixPrompt }: {
   scanId: string; finding: Finding; allFindings: Finding[]; onStatus: (f: Finding) => void; onFixPrompt: (ids: string[]) => void;
@@ -20,9 +20,55 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
   const [expBusy, setExpBusy] = useState(false);
   const [expErr, setExpErr] = useState<string | null>(null);
   const [statusErr, setStatusErr] = useState<string | null>(null);
+
+  const [correction, setCorrection] = useState<FindingCorrection | null>(null);
+  const [correctBusy, setCorrectBusy] = useState(false);
+  const [correctErr, setCorrectErr] = useState<string | null>(null);
+  const [applyBusy, setApplyBusy] = useState(false);
+  const [applyResult, setApplyResult] = useState<ApplyFixResult | null>(null);
+
   const toast = useToast();
 
-  useEffect(() => { setExp(null); setExpErr(null); setStatusErr(null); }, [finding.id]);
+  useEffect(() => {
+    setExp(null);
+    setExpErr(null);
+    setStatusErr(null);
+    setCorrection(null);
+    setCorrectErr(null);
+    setApplyResult(null);
+  }, [finding.id]);
+
+  useEffect(() => {
+    if (tab === "correct" && !correction && !correctBusy && !correctErr) {
+      loadCorrection();
+    }
+  }, [tab, finding.id]);
+
+  const loadCorrection = async () => {
+    setCorrectBusy(true);
+    setCorrectErr(null);
+    try {
+      const res = await api.correctFinding(scanId, finding.id);
+      setCorrection(res);
+    } catch (e) {
+      setCorrectErr((e as Error).message);
+    } finally {
+      setCorrectBusy(false);
+    }
+  };
+
+  const applyFix = async (rescan: boolean) => {
+    setApplyBusy(true);
+    try {
+      const res = await api.applyFindingFix(scanId, finding.id, { rescan });
+      setApplyResult(res);
+      toast(res.rescan_id ? "Fix applied and verified with rescan!" : "Fix applied to file!");
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setApplyBusy(false);
+    }
+  };
 
   const explain = async () => {
     setExpBusy(true);
@@ -40,7 +86,12 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
   };
 
   const firstLine = Math.max(1, finding.line - 2);
-  const tabs: [Tab, string, typeof Info][] = [["evidence", "Evidence and fix", BookOpen], ["code", "Code", Code2], ["explain", "AI explanation", Sparkles]];
+  const tabs: [Tab, string, typeof Info][] = [
+    ["evidence", "Evidence and fix", BookOpen],
+    ["code", "Code", Code2],
+    ["correct", "Correct Code", CheckCircle2],
+    ["explain", "AI explanation", Sparkles],
+  ];
 
   return (
     <article className="animate-rise" aria-label={`Finding detail: ${finding.title}`}>
@@ -58,8 +109,9 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
       <div role="tablist" className="flex gap-1 border-b border-line-soft px-3">
         {tabs.map(([key, label, Icon]) => (
           <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
-            className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-3 text-sm ${tab === key ? "border-teal text-fg" : "border-transparent text-muted hover:text-fg"}`}>
+            className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-3 text-sm ${tab === key ? "border-teal text-fg font-medium" : "border-transparent text-muted hover:text-fg"}`}>
             <Icon className="size-4" /> {label}
+            {key === "correct" && <span className="rounded-full bg-teal/20 px-1.5 py-0.2 text-[10px] font-bold text-teal">Auto-fix</span>}
           </button>
         ))}
       </div>
@@ -86,6 +138,166 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
         )}
 
         {tab === "code" && <CodeViewer scanId={scanId} path={finding.file} focusLine={finding.line} findings={allFindings} />}
+
+        {tab === "correct" && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal/20 bg-teal/5 p-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-fg">
+                  <ShieldCheck className="size-5 text-teal" />
+                  Automated Code Correction
+                </h3>
+                <p className="mt-1 text-xs text-muted">
+                  Inspect the side-by-side security patch. PatchPilot generates exact replacements to neutralize security flaws while preserving application behavior.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={loadCorrection} disabled={correctBusy} icon={<RefreshCcw className={`size-3.5 ${correctBusy ? "animate-spin" : ""}`} />}>
+                  Regenerate
+                </Button>
+              </div>
+            </div>
+
+            {correctBusy && <Spinner label="Generating code correction and diff..." />}
+            {correctErr && <ErrorBanner message={correctErr} />}
+
+            {correction && (
+              <>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className={`rounded-md px-2 py-0.5 ${correction.source === "ai" ? "bg-sky/10 text-sky border border-sky/20" : "bg-teal/10 text-teal border border-teal/20"}`}>
+                    {correction.source === "ai" ? "AI-Powered Remediation" : "Deterministic Pattern Fix"}
+                  </span>
+                  <span className="text-muted">Target: <code className="font-mono text-fg">{correction.file}:{correction.line}</code></span>
+                </div>
+
+                {correction.explanation && (
+                  <div className="rounded-lg border border-line-soft bg-hull p-4 text-xs leading-relaxed text-muted">
+                    <p className="font-semibold text-fg mb-1">Security Impact & Rationale</p>
+                    <p>{correction.explanation}</p>
+                  </div>
+                )}
+
+                {/* Structured Diff Viewer */}
+                <div className="overflow-hidden rounded-lg border border-line bg-ink">
+                  <div className="flex items-center justify-between border-b border-line-soft bg-raised/60 px-4 py-2 text-xs">
+                    <span className="font-mono text-muted">
+                      {correction.file} (Line {correction.line})
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {correction.fixed_line && (
+                        <CopyButton text={correction.fixed_line} label="Copy fixed code" done="Copied!" />
+                      )}
+                      {correction.diff && (
+                        <CopyButton text={correction.diff} label="Copy full diff" done="Diff copied!" />
+                      )}
+                    </div>
+                  </div>
+
+                  {correction.diff_lines && correction.diff_lines.length > 0 ? (
+                    <div className="font-mono text-[12.5px] leading-6 scroll-thin overflow-x-auto py-2">
+                      {correction.diff_lines.map((line, idx) => {
+                        const isDel = line.type === "del";
+                        const isAdd = line.type === "add";
+                        return (
+                          <div
+                            key={idx}
+                            className={`flex px-3 transition-colors ${
+                              isDel
+                                ? "bg-red/15 text-red-300 border-l-2 border-red-500"
+                                : isAdd
+                                ? "bg-emerald-500/15 text-emerald-300 border-l-2 border-emerald-500"
+                                : "text-muted hover:bg-raised/20"
+                            }`}
+                          >
+                            <span className="w-8 shrink-0 select-none text-right text-xs opacity-40">
+                              {line.old_line ?? ""}
+                            </span>
+                            <span className="w-8 shrink-0 select-none text-right text-xs opacity-40">
+                              {line.new_line ?? ""}
+                            </span>
+                            <span className="w-6 shrink-0 select-none text-center font-bold">
+                              {isDel ? "-" : isAdd ? "+" : " "}
+                            </span>
+                            <span className="whitespace-pre">{line.text}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-line-soft p-3 font-mono text-xs">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase text-red-400 mb-1.5 flex items-center gap-1">
+                          <span>🔴 Vulnerable Code</span>
+                        </div>
+                        <pre className="bg-red/10 border border-red/20 rounded p-2 text-red-200 overflow-x-auto">
+                          {correction.original_line || correction.original_snippet}
+                        </pre>
+                      </div>
+                      <div className="pt-3 md:pt-0 md:pl-3">
+                        <div className="text-[11px] font-semibold uppercase text-emerald-400 mb-1.5 flex items-center gap-1">
+                          <span>🟢 Corrected Code</span>
+                        </div>
+                        <pre className="bg-emerald-500/10 border border-emerald-500/20 rounded p-2 text-emerald-200 overflow-x-auto">
+                          {correction.fixed_line || correction.corrected_snippet}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Apply Actions */}
+                <div className="rounded-lg border border-line-soft bg-hull/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">Apply Fix Directly</p>
+                      <p className="text-xs text-muted">
+                        Patch the scan file directly and run an automated rescan to verify that this vulnerability is resolved.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="primary"
+                        onClick={() => applyFix(true)}
+                        disabled={applyBusy || !correction.can_apply}
+                        icon={<RefreshCcw className={`size-4 ${applyBusy ? "animate-spin" : ""}`} />}
+                      >
+                        ⚡ Apply Fix & Verify Rescan
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => applyFix(false)}
+                        disabled={applyBusy || !correction.can_apply}
+                        icon={<Wrench className="size-4" />}
+                      >
+                        Apply to File
+                      </Button>
+                    </div>
+                  </div>
+
+                  {applyResult && (
+                    <div className="mt-4 rounded-lg border border-teal/30 bg-teal/10 p-3 text-xs text-fg">
+                      <div className="flex items-center gap-2 font-semibold text-teal">
+                        <CheckCircle2 className="size-4" />
+                        {applyResult.message}
+                      </div>
+                      {applyResult.rescan_id && (
+                        <div className="mt-2 pt-2 border-t border-teal/20 flex items-center justify-between">
+                          <span className="text-muted">Verification rescan created successfully:</span>
+                          <a
+                            href={`#/scans/${applyResult.rescan_id}`}
+                            className="font-bold text-teal hover:underline inline-flex items-center gap-1"
+                          >
+                            Open Verified Rescan ({applyResult.rescan_id}) →
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {tab === "explain" && (
           <div className="space-y-4">
@@ -131,7 +343,19 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
 
       <footer className="space-y-3 border-t border-line-soft p-5">
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => onFixPrompt([finding.id])} icon={<Sparkles className="size-4" />}>Generate fix prompt</Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setTab("correct");
+              if (!correction) loadCorrection();
+            }}
+            icon={<Wrench className="size-4 text-emerald-400" />}
+          >
+            Correct the Code
+          </Button>
+          <Button variant="secondary" onClick={() => onFixPrompt([finding.id])} icon={<Sparkles className="size-4" />}>
+            Generate fix prompt
+          </Button>
           <CopyButton text={finding.remediation_text} label="Copy remediation" done="Remediation copied" />
         </div>
         {finding.status === "fixed" ? (
@@ -153,3 +377,4 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
     </article>
   );
 }
+

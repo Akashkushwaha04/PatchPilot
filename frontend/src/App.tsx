@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FlaskConical, History, LayoutDashboard, Menu, PanelLeftClose, PanelLeftOpen, Plus, ShieldCheck, X } from "lucide-react";
+import { FlaskConical, History, LayoutDashboard, Menu, PanelLeftClose, Plus, ShieldCheck, X } from "lucide-react";
 import { api, type Health } from "./api";
 import { ToastProvider, go, useRoute } from "./ui";
 import Dashboard from "./pages/Dashboard";
@@ -77,20 +77,35 @@ export default function App() {
           }`}
         >
           {/* Header Row with Logo & Burger Button */}
-          <div className={`flex items-center ${sidebarOpen ? "justify-between" : "justify-center"} w-full pb-2`}>
-            <Logo showText={sidebarOpen} />
-            <button
-              onClick={toggleSidebar}
-              className="size-8.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-xl flex items-center justify-center text-white/80 hover:text-white transition-all shadow-sm"
-              title={sidebarOpen ? "Hide navigation options" : "Show navigation options"}
-              aria-label={sidebarOpen ? "Hide navigation options" : "Show navigation options"}
-            >
-              {sidebarOpen ? <PanelLeftClose className="size-4" /> : <Menu className="size-4" />}
-            </button>
-          </div>
+          {sidebarOpen ? (
+            <div className="flex items-center justify-between w-full h-10 px-1">
+              <Logo showText={true} />
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="size-8.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-xl flex items-center justify-center text-white/80 hover:text-white transition-all shadow-sm shrink-0"
+                title="Hide navigation options"
+                aria-label="Hide navigation options"
+              >
+                <PanelLeftClose className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center w-full h-10">
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="size-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-xl flex items-center justify-center text-white/90 hover:text-teal transition-all shadow-sm"
+                title="Show navigation options"
+                aria-label="Show navigation options"
+              >
+                <Menu className="size-5" />
+              </button>
+            </div>
+          )}
 
           {sidebarOpen && (
-            <p className="mt-2 text-xs leading-relaxed text-muted animate-rise">
+            <p className="mt-2 text-xs leading-relaxed text-muted animate-rise px-1">
               Find vulnerabilities. Fix them with AI. Verify every fix.
             </p>
           )}
@@ -140,7 +155,7 @@ export default function App() {
 
         {/* Main Content Area */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Top Bar with Mobile Burger & Desktop Uncollapse Pill */}
+          {/* Top Bar */}
           <header className="flex items-center justify-between liquid-panel mb-4 px-4 py-3">
             <div className="flex items-center gap-3">
               {/* Mobile Hamburger Button */}
@@ -154,20 +169,10 @@ export default function App() {
                 {mobileMenuOpen ? <X className="size-4.5" /> : <Menu className="size-4.5" />}
               </button>
 
-              {/* Desktop Uncollapse Button (Visible when sidebar is collapsed) */}
-              {!sidebarOpen && (
-                <button
-                  type="button"
-                  onClick={toggleSidebar}
-                  className="hidden lg:flex items-center gap-2 rounded-xl px-3 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-xl text-xs font-semibold text-white/90 transition-all shadow-sm"
-                  title="Show options"
-                >
-                  <PanelLeftOpen className="size-4 text-teal" />
-                  <span>Show Menu</span>
-                </button>
-              )}
-
-              <Logo />
+              {/* Show Logo in top bar only when sidebar is collapsed or on mobile */}
+              <div className={sidebarOpen ? "lg:hidden" : "animate-rise"}>
+                <Logo showText={true} />
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

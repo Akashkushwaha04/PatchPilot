@@ -698,4 +698,7 @@ if DIST.is_dir():
         candidate = (DIST / full_path).resolve()
         if full_path and candidate.is_file() and DIST in candidate.parents:
             return FileResponse(candidate)
-        return FileResponse(DIST / "index.html")
+        return FileResponse(
+            DIST / "index.html",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"},
+        )

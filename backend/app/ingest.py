@@ -348,31 +348,66 @@ async def download_github_repo(
     branch: str | None = None,
     timeout: float = 60.0,
 ) -> tuple[bytes, str, str, str]:
-    """Download a GitHub repository as a ZIP archive using the GitHub REST API.
+    """Download a GitHub repository as a ZIP archive.
 
-    Uses `https://api.github.com/repos/{owner}/{repo}/zipball/{branch}` instead of
-    `git clone` to eliminate malicious git hook execution risks.
-
-    Returns:
-        tuple[bytes, str, str, str]: (zip_bytes, owner, repo, ref)
+    For public repositories without a token, downloads directly via GitHub's
+    web archive endpoint (e.g. `https://github.com/{owner}/{repo}/archive/HEAD.zip`)
+    which completely bypasses the shared-IP 60 req/hr GitHub REST API rate limit on cloud platforms.
+    For private repositories or authenticated flows, uses the GitHub REST API.
     """
     import httpx
 
     owner, repo = parse_github_repo_url(repo_url)
     ref = branch.strip() if branch and branch.strip() else ""
 
-    zip_url = f"https://api.github.com/repos/{owner}/{repo}/zipball/{ref}" if ref else f"https://api.github.com/repos/{owner}/{repo}/zipball"
-
     headers = {
-        "User-Agent": "PatchPilotAI-GitHubIngest/1.0",
-        "Accept": "application/vnd.github+json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
     if token and token.strip():
         headers["Authorization"] = f"Bearer {token.strip()}"
+        headers["Accept"] = "application/vnd.github+json"
 
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
-            resp = await client.get(zip_url, headers=headers)
+            # 1. For public repositories (when no token is supplied), use direct web archive
+            # download to avoid shared cloud IP rate limits on api.github.com
+            if not token:
+                candidate_urls = []
+                if ref:
+                    candidate_urls.append(f"https://github.com/{owner}/{repo}/archive/refs/heads/{ref}.zip")
+                    candidate_urls.append(f"https://github.com/{owner}/{repo}/archive/refs/tags/{ref}.zip")
+                candidate_urls.append(f"https://github.com/{owner}/{repo}/archive/HEAD.zip")
+                candidate_urls.append(f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/{ref or 'main'}")
+
+                for direct_url in candidate_urls:
+                    try:
+                        web_resp = await client.get(direct_url, headers=headers)
+                        if web_resp.status_code == 200 and len(web_resp.content) > 100:
+                            zip_bytes = web_resp.content
+                            if len(zip_bytes) > MAX_ARCHIVE_BYTES:
+                                raise IngestError(
+                                    f"Downloaded repository archive ({len(zip_bytes) // (1024 * 1024)} MB) exceeds the {MAX_ARCHIVE_BYTES // (1024 * 1024)} MB limit.",
+                                    413,
+                                )
+                            return zip_bytes, owner, repo, ref or "default"
+                    except IngestError:
+                        raise
+                    except Exception:
+                        continue
+
+            # 2. REST API endpoint (mandatory for private repos with token, or fallback)
+            zip_url = f"https://api.github.com/repos/{owner}/{repo}/zipball/{ref}" if ref else f"https://api.github.com/repos/{owner}/{repo}/zipball"
+            api_headers = dict(headers)
+            api_headers["Accept"] = "application/vnd.github+json"
+            resp = await client.get(zip_url, headers=api_headers)
+
+            # If REST API hits rate limits on public repo, try direct archive one last time
+            if resp.status_code in (403, 429) and not token:
+                direct_url = f"https://github.com/{owner}/{repo}/archive/HEAD.zip"
+                web_resp = await client.get(direct_url, headers=headers)
+                if web_resp.status_code == 200 and len(web_resp.content) > 100:
+                    zip_bytes = web_resp.content
+                    return zip_bytes, owner, repo, ref or "default"
 
             if resp.status_code == 404:
                 raise IngestError(
@@ -386,7 +421,7 @@ async def download_github_repo(
                 )
             elif resp.status_code in (403, 429):
                 raise IngestError(
-                    "GitHub API rate limit exceeded or access forbidden. Supply a valid Personal Access Token with 'repo' scope to authenticate.",
+                    "GitHub API rate limit exceeded on public cloud IP. Supply a GitHub Personal Access Token or upload a ZIP of the source code directly.",
                     403,
                 )
             elif resp.status_code != 200:

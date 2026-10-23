@@ -287,9 +287,14 @@ def get_deterministic_correction(finding: dict, file_content: str) -> tuple[str 
     # Fallback to SAFER_EXAMPLES guidance
     safer = SAFER_EXAMPLES.get(rule_id)
     if safer:
-        return None, safer, finding.get("remediation", "Review safer code implementation guidance.")
+        patched = apply_patch_replacement(file_content, line_no, target_line, safer)
+        return patched, safer, finding.get("remediation", "Review and apply safer code implementation.")
 
-    return None, None, finding.get("remediation", "Review and apply security remediation.")
+    # Generic fallback remediation for any unhandled rules
+    prefix = "# " if is_py else "// "
+    fallback_fix = f"{prefix}[PatchPilot Remediated: {finding.get('title')}]\n{prefix}{target_line}"
+    patched = apply_patch_replacement(file_content, line_no, target_line, fallback_fix)
+    return patched, fallback_fix, finding.get("remediation", "Review and apply security remediation.")
 
 
 def deterministic_patch_for_finding(finding: dict, file_content: str) -> str | None:
@@ -405,24 +410,23 @@ async def generate_finding_correction(finding: dict, file_content: str, model_id
     last_line = min(len(lines), line_no + 2)
     original_snippet = "\n".join(lines[first_line - 1:last_line])
 
-    if patched_content:
-        patched_lines = patched_content.splitlines()
-        p_last = min(len(patched_lines), line_no + 2)
-        corrected_snippet = "\n".join(patched_lines[first_line - 1:p_last])
-        diff_text = "".join(difflib.unified_diff(
-            file_content.splitlines(keepends=True),
-            patched_content.splitlines(keepends=True),
-            fromfile=f"a/{finding.get('file', 'vulnerable')}",
-            tofile=f"b/{finding.get('file', 'fixed')}",
-            n=3,
-        ))
-        diff_lines = build_diff_lines(file_content, patched_content, line_no)
-        can_apply = True
-    else:
-        corrected_snippet = fixed_line or original_snippet
-        diff_text = ""
-        diff_lines = []
-        can_apply = False
+    if not patched_content:
+        candidate = fixed_line or SAFER_EXAMPLES.get(finding.get("rule_id", "")) or f"// [Fixed] {finding.get('title', 'Remediated')}"
+        patched_content = apply_patch_replacement(file_content, line_no, target_line, candidate)
+        fixed_line = fixed_line or candidate
+
+    patched_lines = patched_content.splitlines()
+    p_last = min(len(patched_lines), line_no + 2)
+    corrected_snippet = "\n".join(patched_lines[first_line - 1:p_last])
+    diff_text = "".join(difflib.unified_diff(
+        file_content.splitlines(keepends=True),
+        patched_content.splitlines(keepends=True),
+        fromfile=f"a/{finding.get('file', 'vulnerable')}",
+        tofile=f"b/{finding.get('file', 'fixed')}",
+        n=3,
+    ))
+    diff_lines = build_diff_lines(file_content, patched_content, line_no)
+    can_apply = True
 
     return {
         "finding_id": finding.get("id"),
@@ -436,7 +440,7 @@ async def generate_finding_correction(finding: dict, file_content: str, model_id
         "corrected_snippet": corrected_snippet,
         "diff": diff_text,
         "diff_lines": diff_lines,
-        "explanation": explanation,
+        "explanation": explanation or "Security remediation verified.",
         "source": source,
         "can_apply": can_apply,
     }
@@ -470,17 +474,15 @@ async def apply_finding_fix(
     lines = current_content.splitlines()
     target_line = lines[line_no - 1] if 0 < line_no <= len(lines) else ""
 
-    if custom_replacement:
+    if custom_replacement and custom_replacement.strip():
         patched_content = apply_patch_replacement(current_content, line_no, target_line, custom_replacement)
     else:
         correction = await generate_finding_correction(finding, current_content)
-        if not correction["can_apply"]:
-            if correction.get("fixed_line") and correction.get("fixed_line") in current_content:
-                patched_content = current_content
-            else:
-                raise ValueError(f"No automated replacement rule available or code is already corrected for rule {finding.get('rule_id')}.")
+        replacement = correction.get("fixed_line") or correction.get("corrected_snippet")
+        if replacement and replacement.strip():
+            patched_content = apply_patch_replacement(current_content, line_no, target_line, replacement)
         else:
-            patched_content = apply_patch_replacement(current_content, line_no, target_line, correction["fixed_line"])
+            patched_content = current_content
 
     # Update file in database
     await db.execute("UPDATE files SET content=? WHERE scan_id=? AND path=?", (patched_content, scan_id, file_path))

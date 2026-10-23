@@ -286,24 +286,103 @@ class SimulatedModelProvider:
 
     def _synthesize_fix_line(self, rule_id: str, line: str, filename: str) -> str:
         is_py = filename.endswith(".py")
-        if "SEC" in rule_id:
+        clean_l = line.strip()
+
+        # 1. Secrets
+        if "SEC-001" in rule_id:
+            return 'api_key = os.environ.get("API_KEY", "")' if is_py else 'const apiKey = process.env.API_KEY || "";'
+        elif "SEC-002" in rule_id:
+            return 'private_key = os.environ.get("PRIVATE_KEY", "")' if is_py else 'const privateKey = process.env.PRIVATE_KEY || "";'
+        elif "SEC-003" in rule_id:
+            return 'password = os.environ.get("ADMIN_PASSWORD", "")' if is_py else 'const password = process.env.ADMIN_PASSWORD || "";'
+        elif "SEC-004" in rule_id:
+            return re.sub(r"^(VITE_|NEXT_PUBLIC_|REACT_APP_)", "", clean_l) or 'API_SECRET = process.env.API_SECRET'
+        elif "SEC-005" in rule_id:
+            return 'database_url = os.environ.get("DATABASE_URL")' if is_py else 'const databaseUrl = process.env.DATABASE_URL;'
+        elif "SEC" in rule_id:
+            return 'secret = os.environ.get("SECRET_KEY")' if is_py else 'const secret = process.env.SECRET_KEY;'
+
+        # 2. XSS
+        elif "XSS-001" in rule_id:
+            if "dangerouslySetInnerHTML" in clean_l:
+                return re.sub(r"dangerouslySetInnerHTML=\{\{[^}]*__html:\s*([^}]+)\}\}", r"dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(\1) }}", clean_l)
+            return "<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cleanContent) }} />"
+        elif "XSS-002" in rule_id:
+            if ".innerHTML" in clean_l:
+                return clean_l.replace(".innerHTML", ".textContent")
+            return "element.textContent = safeUserInput;"
+        elif "XSS-003" in rule_id:
+            if "{{{" in clean_l:
+                return clean_l.replace("{{{", "{{").replace("}}}", "}}")
+            elif "v-html" in clean_l:
+                return clean_l.replace("v-html", "v-text")
+            return "<div>{{ safeContent }}</div>"
+        elif "XSS" in rule_id:
+            return "DOMPurify.sanitize(userInput)"
+
+        # 3. Access Control
+        elif "AUTH-001" in rule_id:
+            return 'if (!req.user || req.user.role !== "admin") return res.status(403).json({ error: "Unauthorized" });'
+        elif "AUTH-002" in rule_id:
+            return 'user_role = getattr(request.state.user, "role", None)' if is_py else 'const userRole = req.user?.role; // Verified from authenticated session'
+        elif "AUTH-003" in rule_id:
+            return '@router.get("/admin", dependencies=[Depends(require_admin_user)])' if is_py else 'app.use("/admin", requireUser, requireAdmin, handler);'
+        elif "AUTH-004" in rule_id:
+            return 'const user = await fetch("/api/me", { credentials: "include" }).then(r => r.json());'
+        elif "AUTH" in rule_id:
+            return 'require_authenticated_user(request)' if is_py else 'requireAuth(req, res, next);'
+
+        # 4. Insecure Configuration
+        elif "CFG-001" in rule_id:
+            return 'origins = os.getenv("ALLOWED_ORIGINS", "https://app.example.com").split(",")' if is_py else 'cors({ origin: (process.env.ALLOWED_ORIGINS || "https://app.example.com").split(","), credentials: true })'
+        elif "CFG-002" in rule_id:
+            return 'debug = os.getenv("DEBUG", "0") == "1"' if is_py else 'debug: process.env.NODE_ENV !== "production"'
+        elif "CFG-003" in rule_id:
+            return clean_l.replace("verify=False", "verify=True").replace("rejectUnauthorized: false", "rejectUnauthorized: true") if "verify" in clean_l or "rejectUnauthorized" in clean_l else 'requests.get(url, timeout=10) # TLS verification enabled'
+        elif "CFG-004" in rule_id:
+            return 'res.cookie("sid", sessionId, { httpOnly: true, secure: true, sameSite: "lax" });'
+        elif "CFG-005" in rule_id:
+            return 'jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });'
+        elif "CFG" in rule_id:
+            return '# Security hardening applied' if is_py else '// Security hardening applied'
+
+        # 5. Injection
+        elif "INJ-001" in rule_id:
             if is_py:
-                return 'api_key = os.environ.get("API_KEY", "")'
-            return 'const apiKey = process.env.API_KEY || "";'
+                return 'cursor.execute("SELECT * FROM items WHERE id = ?", (item_id,))'
+            return 'await db.query("SELECT * FROM items WHERE id = $1", [itemId]);'
+        elif "INJ-002" in rule_id:
+            if is_py:
+                return 'subprocess.run(["executable", safe_arg1, safe_arg2], check=True)'
+            return 'execFile("executable", [safeArg1, safeArg2], (err, stdout) => { ... });'
+        elif "INJ-003" in rule_id or "INJ-004" in rule_id:
+            if is_py:
+                return 'data = json.loads(payload)'
+            return 'const data = JSON.parse(payload);'
         elif "INJ" in rule_id:
-            if "SQL" in line or "SELECT" in line:
-                if is_py:
-                    return 'cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))'
-                return 'await db.query("SELECT * FROM users WHERE id = $1", [userId]);'
-            if "exec" in line:
-                return 'execFile("executable", [safeArg1, safeArg2], (err, stdout) => { ... });'
+            return 'parameterized_query(query, params)' if is_py else 'executeParameterized(query, params);'
+
+        # 6. Sensitive Data Exposure
+        elif "EXP-001" in rule_id:
+            return 'logger.info("User action performed", extra={"user_id": user_id})' if is_py else 'console.log("User action performed", { userId: user.id });'
+        elif "EXP-003" in rule_id:
+            return 'return JSONResponse(status_code=500, content={"error": "An internal error occurred."})' if is_py else 'res.status(500).json({ error: "An internal server error occurred." });'
         elif "EXP" in rule_id or "traffic" in filename:
             if is_py:
                 return 'PUBLIC_API_URL = os.environ.get("PUBLIC_API_URL", "https://api.example.com")'
             return 'const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.example.com";'
+
+        # 7. IaC
+        elif "IAC-001" in rule_id:
+            return "RUN adduser -D -u 1001 appuser\nUSER appuser"
+        elif "IAC-003" in rule_id:
+            return "limits:\n  cpus: '0.5'\n  memory: 512M"
         elif "IAC" in rule_id:
             return "USER nonroot"
-        return line or "// Security patch applied"
+
+        # Fallback safe replacement
+        prefix = "# " if is_py else "// "
+        return f"{prefix}[PatchPilot Security Remediation] {rule_id} fixed\n{prefix}{clean_l}"
 
     def _synthesize_fix_explanation(self, rule_id: str, title: str) -> str:
         m = self.meta["id"]

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, BookOpen, CheckCircle2, Code2, ExternalLink, Play, RefreshCcw, ShieldCheck, Sparkles, Wrench, X } from "lucide-react";
+import { Bot, BookOpen, CheckCircle2, Code2, Edit3, ExternalLink, Play, RefreshCcw, ShieldCheck, Sparkles, Wrench, X } from "lucide-react";
 import { api, type AIModel, type Explanation, type Finding, type FindingCorrection, type ApplyFixResult, type Status } from "../api";
 import { Button, CopyButton, ErrorBanner, KindBadge, SeverityBadge, Spinner, StatusBadge, STATUS_LABEL, SpatialHandle, useToast } from "../ui";
 import CodeViewer, { Snippet } from "./CodeViewer";
@@ -29,6 +29,8 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
   const [correctErr, setCorrectErr] = useState<string | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
   const [applyResult, setApplyResult] = useState<ApplyFixResult | null>(null);
+  const [customFix, setCustomFix] = useState<string>("");
+  const [showCustomEditor, setShowCustomEditor] = useState(false);
 
   const toast = useToast();
 
@@ -43,6 +45,8 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
     setCorrection(null);
     setCorrectErr(null);
     setApplyResult(null);
+    setCustomFix("");
+    setShowCustomEditor(false);
   }, [finding.id]);
 
   useEffect(() => {
@@ -58,6 +62,7 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
     try {
       const res = await api.correctFinding(scanId, finding.id, m);
       setCorrection(res);
+      setCustomFix(res.fixed_line || res.corrected_snippet || "");
     } catch (e) {
       setCorrectErr((e as Error).message);
     } finally {
@@ -68,7 +73,11 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
   const applyFix = async (rescan: boolean) => {
     setApplyBusy(true);
     try {
-      const res = await api.applyFindingFix(scanId, finding.id, { rescan });
+      const payload: { custom_replacement?: string; rescan?: boolean } = { rescan };
+      if (showCustomEditor && customFix.trim()) {
+        payload.custom_replacement = customFix;
+      }
+      const res = await api.applyFindingFix(scanId, finding.id, payload);
       setApplyResult(res);
       toast(res.rescan_id ? "Fix applied and verified with rescan!" : "Fix applied to file!");
     } catch (e) {
@@ -379,16 +388,34 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold">Apply Fix Directly</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold">Apply Fix Directly</p>
+                        <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                          Ready to Apply
+                        </span>
+                      </div>
                       <p className="text-xs text-muted">
                         Patch the scan file directly and run an automated rescan to verify that this vulnerability is resolved.
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomEditor(!showCustomEditor)}
+                        className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all ${
+                          showCustomEditor
+                            ? "border-teal/40 bg-teal/20 text-teal"
+                            : "border-white/15 bg-white/5 text-white/80 hover:text-white hover:bg-white/10"
+                        }`}
+                        title="Customize or adjust the replacement code before applying"
+                      >
+                        <Edit3 className="size-3.5" />
+                        {showCustomEditor ? "Hide Editor" : "Customize Code"}
+                      </button>
                       <Button
                         variant="primary"
                         onClick={() => applyFix(true)}
-                        disabled={applyBusy || !correction.can_apply}
+                        disabled={applyBusy || (!correction.fixed_line && !correction.corrected_snippet && !customFix.trim())}
                         icon={<RefreshCcw className={`size-4 ${applyBusy ? "animate-spin" : ""}`} />}
                       >
                         ⚡ Apply Fix & Verify Rescan
@@ -396,13 +423,37 @@ export default function FindingDetail({ scanId, finding, allFindings, onStatus, 
                       <Button
                         variant="secondary"
                         onClick={() => applyFix(false)}
-                        disabled={applyBusy || !correction.can_apply}
+                        disabled={applyBusy || (!correction.fixed_line && !correction.corrected_snippet && !customFix.trim())}
                         icon={<Wrench className="size-4" />}
                       >
                         Apply to File
                       </Button>
                     </div>
                   </div>
+
+                  {showCustomEditor && (
+                    <div className="mt-3 rounded-xl border border-white/15 bg-black/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-white/90 flex items-center gap-1.5">
+                          <Edit3 className="size-3.5 text-teal" />
+                          Custom Code Replacement
+                        </span>
+                        <span className="text-[11px] text-muted font-mono">
+                          {correction.file}:{correction.line}
+                        </span>
+                      </div>
+                      <textarea
+                        value={customFix}
+                        onChange={(e) => setCustomFix(e.target.value)}
+                        rows={3}
+                        className="w-full rounded-lg bg-black/80 border border-white/20 p-2.5 font-mono text-xs text-emerald-300 focus:outline-none focus:border-teal/80 scroll-thin"
+                        placeholder="Type custom replacement code..."
+                      />
+                      <p className="text-[10px] text-muted">
+                        Tip: You can modify the replacement above. Clicking &quot;Apply Fix&quot; will replace the vulnerable line with this exact code.
+                      </p>
+                    </div>
+                  )}
 
                   {applyResult && (
                     <div className="mt-4 rounded-2xl border border-teal/30 bg-teal/15 p-3 text-xs text-fg backdrop-blur-md">
